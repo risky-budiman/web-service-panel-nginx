@@ -43,6 +43,17 @@ async function requestSsl(req, res) {
       return res.status(404).json({ success: false, message: 'Proxy domain tidak ditemukan' });
     }
 
+    // Terbitkan sertifikat SSL dengan Certbot jika di server Linux
+    if (process.platform === 'linux') {
+      const certResult = await systemExec.obtainCertificate(proxy.domain_name);
+      if (!certResult.success) {
+        return res.status(500).json({
+          success: false,
+          message: certResult.message || 'Gagal menerbitkan sertifikat Let\'s Encrypt'
+        });
+      }
+    }
+
     // Update status SSL pada database
     ProxyModel.update(proxy.id, {
       domain_name: proxy.domain_name,
@@ -58,7 +69,7 @@ async function requestSsl(req, res) {
 
     res.json({
       success: true,
-      message: `SSL untuk domain '${proxy.domain_name}' berhasil diaktifkan`,
+      message: `SSL untuk domain '${proxy.domain_name}' berhasil diterbitkan dan diaktifkan`,
       data: updatedProxy
     });
   } catch (err) {

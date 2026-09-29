@@ -109,7 +109,19 @@ server {
  * Generate dan tulis file konfigurasi Nginx
  */
 function generateConfig(proxy) {
-  const config = proxy.ssl_enabled ? generateHttpsConfig(proxy) : generateHttpConfig(proxy);
+  let useSsl = Boolean(proxy.ssl_enabled);
+
+  // Jika di Linux, pastikan sertifikat Let's Encrypt benar-benar ada di disk
+  if (useSsl && process.platform === 'linux') {
+    const certPath = `/etc/letsencrypt/live/${proxy.domain_name}/fullchain.pem`;
+    const keyPath = `/etc/letsencrypt/live/${proxy.domain_name}/privkey.pem`;
+    if (!fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
+      console.warn(`⚠️  File sertifikat SSL belum ditemukan untuk ${proxy.domain_name}. Tetap gunakan konfigurasi HTTP.`);
+      useSsl = false;
+    }
+  }
+
+  const config = useSsl ? generateHttpsConfig(proxy) : generateHttpConfig(proxy);
   const filename = `${proxy.domain_name}.conf`;
   const filepath = path.join(NGINX_CONF_DIR, filename);
 

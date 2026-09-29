@@ -53,20 +53,43 @@ async function reloadNginx() {
 }
 
 /**
- * Cek status Nginx
+ * Cek apakah file sertifikat Let's Encrypt sudah ada di disk
  */
-async function getNginxStatus() {
+function hasCertificate(domain) {
+  const fs = require('fs');
+  const certPath = `/etc/letsencrypt/live/${domain}/fullchain.pem`;
+  const keyPath = `/etc/letsencrypt/live/${domain}/privkey.pem`;
+  return fs.existsSync(certPath) && fs.existsSync(keyPath);
+}
+
+/**
+ * Request sertifikat SSL via Certbot (Let's Encrypt)
+ */
+async function obtainCertificate(domain) {
   if (!isLinux) {
-    return { running: null, message: 'Status check hanya tersedia di Linux' };
+    console.log(`⚠️  Certbot skipped for domain ${domain} (bukan Linux)`);
+    return { success: true, message: 'Certbot skipped (development mode)' };
   }
 
   try {
-    const { stdout } = await execAsync('systemctl is-active nginx');
-    const isActive = stdout.trim() === 'active';
-    return { running: isActive, message: isActive ? 'Nginx sedang berjalan' : 'Nginx tidak aktif' };
+    // Jalankan certbot dengan plugin nginx secara non-interaktif
+    const cmd = `sudo certbot certonly --nginx -d ${domain} --non-interactive --agree-tos --register-unsafely-without-email`;
+    const { stdout, stderr } = await execAsync(cmd);
+    const output = stdout || stderr;
+
+    if (hasCertificate(domain)) {
+      return { success: true, message: 'Sertifikat SSL berhasil diterbitkan oleh Let\'s Encrypt', output };
+    } else {
+      return { success: false, message: 'Certbot selesai tetapi sertifikat tidak ditemukan', output };
+    }
   } catch (err) {
-    return { running: false, message: 'Nginx tidak aktif atau tidak terinstall' };
+    console.error('Certbot error:', err);
+    return {
+      success: false,
+      message: 'Gagal menerbitkan sertifikat SSL: ' + (err.stderr || err.message),
+      error: err.message
+    };
   }
 }
 
-module.exports = { testConfig, reloadNginx, getNginxStatus };
+module.exports = { testConfig, reloadNginx, getNginxStatus, hasCertificate, obtainCertificate };
