@@ -32,7 +32,8 @@
         <p>Silakan buat proxy domain terlebih dahulu di menu Dashboard.</p>
       </div>
 
-      <table v-else class="data-table">
+      <div v-else class="table-wrapper">
+        <table class="data-table">
         <thead>
           <tr>
             <th>Domain</th>
@@ -93,6 +94,7 @@
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
   </div>
 </template>

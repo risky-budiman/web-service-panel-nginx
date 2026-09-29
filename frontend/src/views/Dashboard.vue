@@ -1,7 +1,14 @@
 <template>
   <div class="app-layout">
+    <!-- Mobile Sidebar Backdrop Overlay -->
+    <div
+      v-if="sidebarOpen"
+      class="sidebar-overlay"
+      @click="sidebarOpen = false"
+    ></div>
+
     <!-- Sidebar -->
-    <aside class="sidebar">
+    <aside class="sidebar" :class="{ open: sidebarOpen }">
       <div class="sidebar-header">
         <div class="sidebar-logo">
           <div class="sidebar-logo-icon">🖥️</div>
@@ -10,6 +17,14 @@
             <span>Control Center</span>
           </div>
         </div>
+        <!-- Close button on mobile -->
+        <button
+          class="mobile-close-btn"
+          @click="sidebarOpen = false"
+          title="Tutup Menu"
+        >
+          ✕
+        </button>
       </div>
 
       <nav class="sidebar-nav">
@@ -17,7 +32,7 @@
           class="sidebar-nav-item"
           :class="{ active: currentTab === 'dashboard' }"
           href="#"
-          @click.prevent="currentTab = 'dashboard'"
+          @click.prevent="currentTab = 'dashboard'; sidebarOpen = false"
         >
           📊 Dashboard
         </a>
@@ -25,7 +40,7 @@
           class="sidebar-nav-item"
           :class="{ active: currentTab === 'ssl' }"
           href="#"
-          @click.prevent="currentTab = 'ssl'"
+          @click.prevent="currentTab = 'ssl'; sidebarOpen = false"
         >
           🔒 SSL Certificates
         </a>
@@ -33,7 +48,7 @@
           class="sidebar-nav-item"
           :class="{ active: currentTab === 'logs' }"
           href="#"
-          @click.prevent="currentTab = 'logs'"
+          @click.prevent="currentTab = 'logs'; sidebarOpen = false"
         >
           📋 Access Logs
         </a>
@@ -41,7 +56,7 @@
           class="sidebar-nav-item"
           :class="{ active: currentTab === 'settings' }"
           href="#"
-          @click.prevent="currentTab = 'settings'"
+          @click.prevent="currentTab = 'settings'; sidebarOpen = false"
         >
           ⚙️ Settings
         </a>
@@ -58,18 +73,27 @@
     <main class="main-content">
       <!-- Top Bar -->
       <header class="topbar">
-        <h2 class="topbar-title">
-          <span v-if="currentTab === 'dashboard'">📊 Dashboard Proxy</span>
-          <span v-else-if="currentTab === 'ssl'">🔒 Sertifikat SSL</span>
-          <span v-else-if="currentTab === 'logs'">📋 Nginx Access Logs</span>
-          <span v-else-if="currentTab === 'settings'">⚙️ Pengaturan Sistem</span>
-        </h2>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <button
+            class="mobile-menu-btn"
+            @click="sidebarOpen = true"
+            title="Buka Menu"
+          >
+            ☰
+          </button>
+          <h2 class="topbar-title">
+            <span v-if="currentTab === 'dashboard'">📊 Dashboard Proxy</span>
+            <span v-else-if="currentTab === 'ssl'">🔒 Sertifikat SSL</span>
+            <span v-else-if="currentTab === 'logs'">📋 Nginx Access Logs</span>
+            <span v-else-if="currentTab === 'settings'">⚙️ Pengaturan Sistem</span>
+          </h2>
+        </div>
         <div class="topbar-actions">
           <button class="btn btn-secondary btn-sm" @click="handleRefreshAll" :disabled="loading">
-            🔄 Refresh
+            🔄 <span class="btn-text">Refresh</span>
           </button>
-          <button class="btn btn-primary" v-if="currentTab === 'dashboard'" @click="showAddForm = true">
-            ➕ Tambah Proxy
+          <button class="btn btn-primary btn-sm" v-if="currentTab === 'dashboard'" @click="showAddForm = true">
+            ➕ <span class="btn-text">Tambah Proxy</span>
           </button>
         </div>
       </header>
@@ -253,6 +277,7 @@ import Settings from './Settings.vue'
 const router = useRouter()
 const currentTab = ref('dashboard')
 const refreshKey = ref(0)
+const sidebarOpen = ref(false)
 
 const proxies = ref([])
 const stats = reactive({ total: 0, active: 0, inactive: 0, error: 0, ssl_enabled: 0 })

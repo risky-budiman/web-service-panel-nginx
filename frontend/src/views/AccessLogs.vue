@@ -85,46 +85,48 @@
         <p>Belum ada request yang tercatat atau tidak cocok dengan filter.</p>
       </div>
 
-      <table v-else class="data-table">
-        <thead>
-          <tr>
-            <th style="width: 140px;">Waktu</th>
-            <th style="width: 130px;">Client IP</th>
-            <th style="width: 80px;">Method</th>
-            <th style="width: 90px;">Status</th>
-            <th>Path Request</th>
-            <th style="width: 90px; text-align: right;">Size</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="log in filteredLogs" :key="log.id">
-            <td style="color: var(--text-secondary); font-size: 12px; font-family: monospace;">
-              {{ log.time }}
-            </td>
-            <td>
-              <code style="background: var(--bg-primary); padding: 2px 6px; border-radius: 4px; font-size: 12px;">
-                {{ log.ip }}
-              </code>
-            </td>
-            <td>
-              <span class="badge" :class="getMethodClass(log.method)">
-                {{ log.method }}
-              </span>
-            </td>
-            <td>
-              <span class="badge" :class="getStatusClass(log.status)">
-                {{ log.status }}
-              </span>
-            </td>
-            <td style="color: var(--text-primary); font-family: monospace; font-size: 13px;">
-              {{ log.path }}
-            </td>
-            <td style="text-align: right; color: var(--text-secondary); font-size: 12px;">
-              {{ log.size }} B
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div v-else class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width: 140px;">Waktu</th>
+              <th style="width: 130px;">Client IP</th>
+              <th style="width: 80px;">Method</th>
+              <th style="width: 90px;">Status</th>
+              <th>Path Request</th>
+              <th style="width: 90px; text-align: right;">Size</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="log in filteredLogs" :key="log.id">
+              <td style="color: var(--text-secondary); font-size: 12px; font-family: monospace;">
+                {{ log.time }}
+              </td>
+              <td>
+                <code style="background: var(--bg-primary); padding: 2px 6px; border-radius: 4px; font-size: 12px;">
+                  {{ log.ip }}
+                </code>
+              </td>
+              <td>
+                <span class="badge" :class="getMethodClass(log.method)">
+                  {{ log.method }}
+                </span>
+              </td>
+              <td>
+                <span class="badge" :class="getStatusClass(log.status)">
+                  {{ log.status }}
+                </span>
+              </td>
+              <td style="color: var(--text-primary); font-family: monospace; font-size: 13px;">
+                {{ log.path }}
+              </td>
+              <td style="text-align: right; color: var(--text-secondary); font-size: 12px;">
+                {{ log.size }} B
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </template>
