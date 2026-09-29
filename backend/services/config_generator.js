@@ -86,20 +86,25 @@ server {
         proxy_pass http://${proxy.target_ip}:${proxy.target_port};
         proxy_http_version 1.1;
 
-        # Headers
+        # Standard Proxy Headers
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Port 443;
+        proxy_set_header X-Forwarded-Host $host;
+
+        proxy_redirect off;
+        proxy_buffering off;
 
         # WebSocket support
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
 
         # Timeouts
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
+        proxy_connect_timeout 90s;
+        proxy_send_timeout 90s;
+        proxy_read_timeout 90s;
     }
 }
 `;
