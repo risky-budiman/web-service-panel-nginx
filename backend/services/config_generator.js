@@ -101,10 +101,15 @@ server {
         # Mencegah kompresi gzip dari backend agar sub_filter dapat mengubah link http ke https
         proxy_set_header Accept-Encoding "";
 
+        # Buffer Optimization untuk Framework Modern (Bun, Node, Vite, React, Vue, Next.js)
+        proxy_buffering on;
+        proxy_buffers 16 32k;
+        proxy_buffer_size 64k;
+        proxy_busy_buffers_size 128k;
+
         # Redirect rewrite agar tidak looping atau kembali ke http
         proxy_redirect http:// https://;
         proxy_cookie_path / "/; Secure; SameSite=None";
-        proxy_buffering off;
 
         # Header Browser CSP: otomatis ubah semua link aset internal http:// menjadi https://
         add_header Content-Security-Policy "upgrade-insecure-requests" always;
@@ -115,12 +120,12 @@ server {
         sub_filter_once off;
         sub_filter_types text/css text/xml text/javascript application/javascript application/x-javascript application/json;
 
-        # WebSocket support
+        # WebSocket support (HMR & Live Reload)
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
 
-        # Timeouts
-        proxy_connect_timeout 120s;
+        # Timeouts fleksibel
+        proxy_connect_timeout 60s;
         proxy_send_timeout 120s;
         proxy_read_timeout 120s;
     }
