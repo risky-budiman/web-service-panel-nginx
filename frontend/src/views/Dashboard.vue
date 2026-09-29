@@ -64,24 +64,24 @@
           <span v-else-if="currentTab === 'logs'">📋 Nginx Access Logs</span>
           <span v-else-if="currentTab === 'settings'">⚙️ Pengaturan Sistem</span>
         </h2>
-        <div class="topbar-actions" v-if="currentTab === 'dashboard'">
-          <button class="btn btn-secondary btn-sm" @click="fetchData" :disabled="loading">
+        <div class="topbar-actions">
+          <button class="btn btn-secondary btn-sm" @click="handleRefreshAll" :disabled="loading">
             🔄 Refresh
           </button>
-          <button class="btn btn-primary" @click="showAddForm = true">
+          <button class="btn btn-primary" v-if="currentTab === 'dashboard'" @click="showAddForm = true">
             ➕ Tambah Proxy
           </button>
         </div>
       </header>
 
       <!-- View: SSL Certificates -->
-      <SslCertificates v-if="currentTab === 'ssl'" />
+      <SslCertificates v-if="currentTab === 'ssl'" :key="'ssl-' + refreshKey" />
 
       <!-- View: Access Logs -->
-      <AccessLogs v-else-if="currentTab === 'logs'" />
+      <AccessLogs v-else-if="currentTab === 'logs'" :key="'logs-' + refreshKey" />
 
       <!-- View: Settings -->
-      <Settings v-else-if="currentTab === 'settings'" />
+      <Settings v-else-if="currentTab === 'settings'" :key="'settings-' + refreshKey" />
 
       <!-- View: Dashboard Main Content -->
       <div v-else class="page-content">
@@ -252,6 +252,7 @@ import Settings from './Settings.vue'
 
 const router = useRouter()
 const currentTab = ref('dashboard')
+const refreshKey = ref(0)
 
 const proxies = ref([])
 const stats = reactive({ total: 0, active: 0, inactive: 0, error: 0, ssl_enabled: 0 })
@@ -263,6 +264,12 @@ const deleteTarget = ref(null)
 onMounted(() => {
   fetchData()
 })
+
+function handleRefreshAll() {
+  refreshKey.value++
+  fetchData()
+  window.__toast?.('Data berhasil diperbarui', 'info')
+}
 
 async function fetchData() {
   loading.value = true

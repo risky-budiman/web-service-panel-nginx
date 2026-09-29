@@ -36,6 +36,19 @@ async function initDb() {
 }
 
 /**
+ * Reload database dari file di disk (setelah proses restore)
+ */
+function reloadDbFromDisk() {
+  if (SQL && fs.existsSync(DB_PATH)) {
+    const fileBuffer = fs.readFileSync(DB_PATH);
+    if (db) db.close();
+    db = new SQL.Database(fileBuffer);
+    return true;
+  }
+  return false;
+}
+
+/**
  * Ambil instance database
  */
 function getDb() {
@@ -133,4 +146,4 @@ function closeDb() {
   }
 }
 
-module.exports = { initDb, getDb, saveDb, closeDb, runAndSave, queryAll, queryOne };
+module.exports = { initDb, getDb, saveDb, closeDb, runAndSave, queryAll, queryOne, reloadDbFromDisk, DB_PATH };

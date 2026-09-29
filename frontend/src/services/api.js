@@ -55,5 +55,8 @@ export default {
   // Settings
   getSystemInfo: () => api.get('/settings/system'),
   changePassword: (currentPassword, newPassword) => api.post('/settings/change-password', { currentPassword, newPassword }),
-  backupDbUrl: '/api/settings/backup-db'
+  backupDbUrl: '/api/settings/backup-db',
+  restoreDb: (fileBuffer) => api.post('/settings/restore-db', fileBuffer, {
+    headers: { 'Content-Type': 'application/octet-stream' }
+  })
 }

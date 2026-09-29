@@ -77,16 +77,43 @@ function backupDatabase(req, res) {
       return res.status(404).json({ success: false, message: 'File database tidak ditemukan' });
     }
 
-    const filename = `panel-backup-${new Date().toISOString().slice(0, 10)}.db`;
-    res.download(dbFile, filename);
+/**
+ * POST /api/settings/restore-db — Restore database SQLite dari file upload binary
+ */
+function restoreDatabase(req, res) {
+  try {
+    const { reloadDbFromDisk } = require('../db/database');
+    const dbFile = path.join(__dirname, '..', 'data', 'panel.db');
+
+    if (!req.body || !Buffer.isBuffer(req.body) || req.body.length === 0) {
+      return res.status(400).json({ success: false, message: 'File database tidak valid atau kosong' });
+    }
+
+    // Buat cadangan database lama terlebih dahulu
+    if (fs.existsSync(dbFile)) {
+      const backupOld = path.join(__dirname, '..', 'data', 'panel.db.bak');
+      fs.copyFileSync(dbFile, backupOld);
+    }
+
+    // Tulis database baru
+    fs.writeFileSync(dbFile, req.body);
+
+    // Muat ulang instance database di memori
+    reloadDbFromDisk();
+
+    res.json({
+      success: true,
+      message: 'Database berhasil dipulihkan (restore) dan dimuat ulang!'
+    });
   } catch (err) {
-    console.error('Error backupDatabase:', err);
-    res.status(500).json({ success: false, message: 'Gagal mendownload backup database' });
+    console.error('Error restoreDatabase:', err);
+    res.status(500).json({ success: false, message: 'Gagal merestore database: ' + err.message });
   }
 }
 
 module.exports = {
   getSystemInfo,
   changePassword,
-  backupDatabase
+  backupDatabase,
+  restoreDatabase
 };

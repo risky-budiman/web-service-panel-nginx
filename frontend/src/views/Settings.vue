@@ -3,11 +3,8 @@
     <div class="section-header">
       <div>
         <h3>⚙️ Pengaturan & Status Sistem</h3>
-        <p class="section-desc">Konfigurasi panel kontrol, keamanan akun, dan cadangan basis data</p>
+        <p class="section-desc">Konfigurasi panel kontrol, keamanan akun, cadangan, dan pemulihan basis data</p>
       </div>
-      <button class="btn btn-secondary btn-sm" @click="fetchSystemInfo" :disabled="loading">
-        🔄 Refresh
-      </button>
     </div>
 
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 24px;">
@@ -43,17 +40,40 @@
         </div>
       </div>
 
-      <!-- Backup Database Card -->
+      <!-- Backup & Restore Database Card -->
       <div class="card">
         <h4 style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
-          <span>💾</span> Backup & Keamanan Data
+          <span>💾</span> Backup & Restore Basis Data
         </h4>
         <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 16px;">
-          Database SQLite panel Anda tersimpan secara atomik di file disk. Anda dapat mengunduh cadangan berkas database sewaktu-waktu untuk proteksi data sebelum migrasi atau update server.
+          Unduh cadangan berkas database sewaktu-waktu atau pulihkan (restore) data dari file cadangan <code>.db</code> sebelumnya.
         </p>
-        <button class="btn btn-primary" @click="downloadBackup" style="width: 100%; justify-content: center;">
-          📥 Download Backup (panel.db)
-        </button>
+
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <button class="btn btn-secondary" @click="downloadBackup" style="width: 100%; justify-content: center;">
+            📥 Download Backup (panel.db)
+          </button>
+
+          <div style="position: relative; border-top: 1px dashed var(--border-color); padding-top: 12px;">
+            <input
+              type="file"
+              ref="fileInput"
+              accept=".db"
+              style="display: none;"
+              @change="handleRestoreFile"
+            />
+            <button
+              class="btn btn-primary"
+              :disabled="restoring"
+              @click="$refs.fileInput.click()"
+              style="width: 100%; justify-content: center;"
+            >
+              <span v-if="restoring" class="spinner"></span>
+              <span v-else>📤</span>
+              {{ restoring ? 'Memulihkan Data...' : 'Pulihkan Database (Restore .db)' }}
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Change Password Card -->
@@ -120,6 +140,8 @@ import api from '../services/api.js'
 const system = ref({})
 const loading = ref(true)
 const pwdLoading = ref(false)
+const restoring = ref(false)
+const fileInput = ref(null)
 
 const pwdForm = reactive({
   currentPassword: '',
@@ -147,6 +169,38 @@ function downloadBackup() {
   const token = localStorage.getItem('token')
   const url = `${api.backupDbUrl}?token=${token}`
   window.open(url, '_blank')
+}
+
+async function handleRestoreFile(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+
+  if (!file.name.endsWith('.db')) {
+    window.__toast?.('File harus berekstensi .db', 'error')
+    return
+  }
+
+  if (!confirm(`Apakah Anda yakin ingin memulihkan database dari '${file.name}'? Data saat ini akan ditimpa dengan data cadangan ini.`)) {
+    event.target.value = ''
+    return
+  }
+
+  restoring.value = true
+  try {
+    const arrayBuffer = await file.arrayBuffer()
+    const res = await api.restoreDb(arrayBuffer)
+    window.__toast?.(res.data?.message || 'Database berhasil dipulihkan!', 'success')
+    fetchSystemInfo()
+    // Muat ulang halaman setelah 1 detik agar semua state aplikasi ter-refresh
+    setTimeout(() => {
+      window.location.reload()
+    }, 1200)
+  } catch (err) {
+    window.__toast?.(err.response?.data?.message || 'Gagal memulihkan database', 'error')
+  } finally {
+    restoring.value = false
+    event.target.value = ''
+  }
 }
 
 async function handleChangePassword() {

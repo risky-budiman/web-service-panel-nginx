@@ -72,6 +72,7 @@ const settingsHandler = require('./handlers/settings_handler');
 app.get('/api/settings/system', authMiddleware, settingsHandler.getSystemInfo);
 app.post('/api/settings/change-password', authMiddleware, settingsHandler.changePassword);
 app.get('/api/settings/backup-db', authMiddleware, settingsHandler.backupDatabase);
+app.post('/api/settings/restore-db', authMiddleware, express.raw({ type: '*/*', limit: '50mb' }), settingsHandler.restoreDatabase);
 
 // ─── Health Check ───────────────────────────────────────────
 app.get('/api/health', (req, res) => {
