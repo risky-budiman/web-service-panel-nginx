@@ -117,7 +117,7 @@
                   {{ log.status }}
                 </span>
               </td>
-              <td style="color: var(--text-primary); font-family: monospace; font-size: 13px;">
+              <td class="path-cell" :title="log.path">
                 {{ log.path }}
               </td>
               <td style="text-align: right; color: var(--text-secondary); font-size: 12px;">
