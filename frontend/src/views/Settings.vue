@@ -1,0 +1,171 @@
+<template>
+  <div class="page-content">
+    <div class="section-header">
+      <div>
+        <h3>⚙️ Pengaturan & Status Sistem</h3>
+        <p class="section-desc">Konfigurasi panel kontrol, keamanan akun, dan cadangan basis data</p>
+      </div>
+      <button class="btn btn-secondary btn-sm" @click="fetchSystemInfo" :disabled="loading">
+        🔄 Refresh
+      </button>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 24px;">
+      <!-- System Info Card -->
+      <div class="card">
+        <h4 style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+          <span>🖥️</span> Informasi Server & Nginx
+        </h4>
+        <div v-if="loading" style="color: var(--text-secondary); padding: 12px 0;">
+          Memuat informasi sistem...
+        </div>
+        <div v-else style="display: flex; flex-direction: column; gap: 12px; font-size: 14px;">
+          <div style="display: flex; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--border-color);">
+            <span style="color: var(--text-secondary);">Sistem Operasi</span>
+            <span style="color: var(--text-primary); font-weight: 500;">{{ system.os || '-' }}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--border-color);">
+            <span style="color: var(--text-secondary);">Node.js Runtime</span>
+            <span style="color: var(--text-primary); font-weight: 500;">{{ system.node_version || '-' }}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--border-color);">
+            <span style="color: var(--text-secondary);">Memori (RAM)</span>
+            <span style="color: var(--text-primary); font-weight: 500;">Free: {{ system.memory?.free }} / Total: {{ system.memory?.total }}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--border-color);">
+            <span style="color: var(--text-secondary);">Nginx Config Directory</span>
+            <code style="color: var(--accent-primary); font-size: 12px;">{{ system.nginx_conf_dir || '-' }}</code>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding-bottom: 8px;">
+            <span style="color: var(--text-secondary);">Database File</span>
+            <code style="color: var(--accent-success); font-size: 12px;">panel.db (SQLite)</code>
+          </div>
+        </div>
+      </div>
+
+      <!-- Backup Database Card -->
+      <div class="card">
+        <h4 style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+          <span>💾</span> Backup & Keamanan Data
+        </h4>
+        <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 16px;">
+          Database SQLite panel Anda tersimpan secara atomik di file disk. Anda dapat mengunduh cadangan berkas database sewaktu-waktu untuk proteksi data sebelum migrasi atau update server.
+        </p>
+        <button class="btn btn-primary" @click="downloadBackup" style="width: 100%; justify-content: center;">
+          📥 Download Backup (panel.db)
+        </button>
+      </div>
+
+      <!-- Change Password Card -->
+      <div class="card" style="grid-column: 1 / -1;">
+        <h4 style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+          <span>🔐</span> Ubah Password Akun Admin
+        </h4>
+        <form @submit.prevent="handleChangePassword" style="max-width: 500px; display: flex; flex-direction: column; gap: 18px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Password Saat Ini</label>
+            <div class="input-icon-wrapper">
+              <span class="input-icon">🔒</span>
+              <input
+                v-model="pwdForm.currentPassword"
+                type="password"
+                class="form-input"
+                placeholder="Masukkan password saat ini"
+                required
+              />
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Password Baru</label>
+            <div class="input-icon-wrapper">
+              <span class="input-icon">✨</span>
+              <input
+                v-model="pwdForm.newPassword"
+                type="password"
+                class="form-input"
+                placeholder="Minimal 6 karakter"
+                required
+              />
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Konfirmasi Password Baru</label>
+            <div class="input-icon-wrapper">
+              <span class="input-icon">🛡️</span>
+              <input
+                v-model="pwdForm.confirmPassword"
+                type="password"
+                class="form-input"
+                placeholder="Ketik ulang password baru"
+                required
+              />
+            </div>
+          </div>
+          <div style="margin-top: 6px;">
+            <button type="submit" class="btn btn-primary" :disabled="pwdLoading">
+              <span v-if="pwdLoading" class="spinner"></span>
+              {{ pwdLoading ? 'Menyimpan...' : '💾 Perbarui Password' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted } from 'vue'
+import api from '../services/api.js'
+
+const system = ref({})
+const loading = ref(true)
+const pwdLoading = ref(false)
+
+const pwdForm = reactive({
+  currentPassword: '',
+  newPassword: '',
+  confirmPassword: ''
+})
+
+onMounted(() => {
+  fetchSystemInfo()
+})
+
+async function fetchSystemInfo() {
+  loading.value = true
+  try {
+    const res = await api.getSystemInfo()
+    system.value = res.data.data
+  } catch (err) {
+    window.__toast?.('Gagal memuat info sistem', 'error')
+  } finally {
+    loading.value = false
+  }
+}
+
+function downloadBackup() {
+  const token = localStorage.getItem('token')
+  const url = `${api.backupDbUrl}?token=${token}`
+  window.open(url, '_blank')
+}
+
+async function handleChangePassword() {
+  if (pwdForm.newPassword !== pwdForm.confirmPassword) {
+    window.__toast?.('Konfirmasi password tidak cocok', 'error')
+    return
+  }
+
+  pwdLoading.value = true
+  try {
+    const res = await api.changePassword(pwdForm.currentPassword, pwdForm.newPassword)
+    window.__toast?.(res.data.message || 'Password berhasil diperbarui', 'success')
+    pwdForm.currentPassword = ''
+    pwdForm.newPassword = ''
+    pwdForm.confirmPassword = ''
+  } catch (err) {
+    window.__toast?.(err.response?.data?.message || 'Gagal mengubah password', 'error')
+  } finally {
+    pwdLoading.value = false
+  }
+}
+</script>

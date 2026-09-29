@@ -1,0 +1,133 @@
+require('dotenv').config();
+
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const path = require('path');
+
+const { initDb, closeDb } = require('./db/database');
+const { authMiddleware } = require('./middleware/auth');
+const { validateProxyInput } = require('./middleware/validator');
+const proxyHandler = require('./handlers/proxy_handler');
+const authHandler = require('./handlers/auth_handler');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// ─── Middleware Global ──────────────────────────────────────
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 menit
+  max: 100, // Max 100 request per 15 menit
+  message: { success: false, message: 'Terlalu banyak request. Coba lagi nanti.' }
+});
+app.use('/api/', limiter);
+
+// ─── Static Files (Vue.js build) ────────────────────────────
+app.use(express.static(path.join(__dirname, '..', 'frontend', 'dist')));
+
+// ─── API Routes: Auth ───────────────────────────────────────
+app.post('/api/auth/login', authHandler.login);
+app.get('/api/auth/me', authMiddleware, authHandler.getCurrentUser);
+
+// ─── API Routes: Proxy (Protected) ─────────────────────────
+app.get('/api/proxies', authMiddleware, proxyHandler.getAllProxies);
+app.get('/api/proxies/:id', authMiddleware, proxyHandler.getProxyById);
+app.post('/api/proxies', authMiddleware, validateProxyInput, proxyHandler.createProxy);
+app.put('/api/proxies/:id', authMiddleware, validateProxyInput, proxyHandler.updateProxy);
+app.delete('/api/proxies/:id', authMiddleware, proxyHandler.deleteProxy);
+app.patch('/api/proxies/:id/toggle', authMiddleware, proxyHandler.toggleProxy);
+
+// ─── API Routes: Stats ──────────────────────────────────────
+app.get('/api/stats', authMiddleware, proxyHandler.getStats);
+
+// ─── API Routes: SSL Certificates ───────────────────────────
+const sslHandler = require('./handlers/ssl_handler');
+app.get('/api/ssl', authMiddleware, sslHandler.getSslCertificates);
+app.post('/api/ssl/request', authMiddleware, sslHandler.requestSsl);
+
+// ─── API Routes: Access Logs ────────────────────────────────
+const logsHandler = require('./handlers/logs_handler');
+app.get('/api/logs', authMiddleware, logsHandler.getLogs);
+app.delete('/api/logs/clear', authMiddleware, logsHandler.clearLogs);
+
+// ─── API Routes: Settings & System ──────────────────────────
+const settingsHandler = require('./handlers/settings_handler');
+app.get('/api/settings/system', authMiddleware, settingsHandler.getSystemInfo);
+app.post('/api/settings/change-password', authMiddleware, settingsHandler.changePassword);
+app.get('/api/settings/backup-db', authMiddleware, settingsHandler.backupDatabase);
+
+// ─── Health Check ───────────────────────────────────────────
+app.get('/api/health', (req, res) => {
+  res.json({ success: true, message: 'Nginx Proxy Panel is running', timestamp: new Date().toISOString() });
+});
+
+// ─── SPA Fallback ───────────────────────────────────────────
+app.get('{*path}', (req, res) => {
+  const indexPath = path.join(__dirname, '..', 'frontend', 'dist', 'index.html');
+  const fs = require('fs');
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.json({
+      success: true,
+      message: '🚀 Nginx Proxy Panel API is running',
+      info: 'Frontend belum di-build. Jalankan: cd frontend && npm run build',
+      endpoints: {
+        health: 'GET /api/health',
+        login: 'POST /api/auth/login',
+        proxies: 'GET /api/proxies',
+        stats: 'GET /api/stats'
+      }
+    });
+  }
+});
+
+// ─── Error Handler ──────────────────────────────────────────
+app.use((err, req, res, next) => {
+  console.error('❌ Unhandled Error:', err);
+  res.status(500).json({ success: false, message: 'Internal server error' });
+});
+
+// ─── Start Server ───────────────────────────────────────────
+async function startServer() {
+  try {
+    // Inisialisasi database
+    await initDb();
+    console.log('✅ Database initialized');
+
+    // Start Express
+    app.listen(PORT, () => {
+      console.log('');
+      console.log('╔══════════════════════════════════════════════╗');
+      console.log('║   🖥️  Nginx Proxy Control Panel              ║');
+      console.log(`║   🌐 http://localhost:${PORT}                   ║`);
+      console.log('║   📋 Default: admin / admin123               ║');
+      console.log('╚══════════════════════════════════════════════╝');
+      console.log('');
+    });
+  } catch (err) {
+    console.error('❌ Gagal start server:', err);
+    process.exit(1);
+  }
+}
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log('\n🛑 Shutting down...');
+  closeDb();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  closeDb();
+  process.exit(0);
+});
+
+startServer();
