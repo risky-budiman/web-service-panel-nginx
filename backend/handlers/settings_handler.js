@@ -77,6 +77,18 @@ function backupDatabase(req, res) {
       return res.status(404).json({ success: false, message: 'File database tidak ditemukan' });
     }
 
+    const dateStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    res.setHeader('Content-Disposition', `attachment; filename=nginx-panel-backup-${dateStr}.db`);
+    res.setHeader('Content-Type', 'application/octet-stream');
+
+    const fileStream = fs.createReadStream(dbFile);
+    fileStream.pipe(res);
+  } catch (err) {
+    console.error('Error backupDatabase:', err);
+    res.status(500).json({ success: false, message: 'Gagal membuat backup database' });
+  }
+}
+
 /**
  * POST /api/settings/restore-db — Restore database SQLite dari file upload binary
  */
