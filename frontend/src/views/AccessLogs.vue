@@ -5,55 +5,69 @@
         <h3>📋 Access Logs</h3>
         <p class="section-desc">Pantau lalu lintas HTTP & akses reverse proxy Nginx secara real-time</p>
       </div>
-      <div>
-        <button class="btn btn-danger btn-sm" @click="clearLogs">
-          🗑️ Bersihkan Log
-        </button>
-      </div>
     </div>
 
-    <!-- Filter Bar -->
-    <div class="card" style="margin-bottom: 20px; padding: 18px 20px;">
-      <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 260px;">
-          <div class="input-icon-wrapper">
-            <span class="input-icon">🔍</span>
-            <input
-              v-model="searchQuery"
-              type="text"
-              class="form-input"
-              placeholder="Cari IP, status HTTP, endpoint path..."
-            />
+    <!-- Filter & Action Toolbar -->
+    <div class="card" style="margin-bottom: 20px; padding: 16px 20px;">
+      <div style="display: flex; gap: 14px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+        <!-- Left: Search and Status Badges -->
+        <div style="display: flex; gap: 12px; align-items: center; flex: 1; min-width: 300px; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 220px; max-width: 380px;">
+            <div class="input-icon-wrapper">
+              <span class="input-icon">🔍</span>
+              <input
+                v-model="searchQuery"
+                type="text"
+                class="form-input"
+                placeholder="Cari IP, status HTTP, endpoint path..."
+                style="padding: 8px 12px 8px 36px; font-size: 13px;"
+              />
+            </div>
+          </div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button
+              class="btn btn-sm"
+              :class="statusFilter === 'all' ? 'btn-primary' : 'btn-secondary'"
+              @click="statusFilter = 'all'"
+            >
+              Semua
+            </button>
+            <button
+              class="btn btn-sm"
+              :class="statusFilter === '2xx' ? 'btn-primary' : 'btn-secondary'"
+              @click="statusFilter = '2xx'"
+            >
+              2xx Success
+            </button>
+            <button
+              class="btn btn-sm"
+              :class="statusFilter === '4xx' ? 'btn-primary' : 'btn-secondary'"
+              @click="statusFilter = '4xx'"
+            >
+              4xx Error
+            </button>
+            <button
+              class="btn btn-sm"
+              :class="statusFilter === '5xx' ? 'btn-primary' : 'btn-secondary'"
+              @click="statusFilter = '5xx'"
+            >
+              5xx Error
+            </button>
           </div>
         </div>
-        <div style="display: flex; gap: 10px;">
-          <button
-            class="btn btn-sm"
-            :class="statusFilter === 'all' ? 'btn-primary' : 'btn-secondary'"
-            @click="statusFilter = 'all'"
+
+        <!-- Right: Actions & Log Counter -->
+        <div style="display: flex; align-items: center; gap: 14px; margin-left: auto;">
+          <span style="font-size: 12px; color: var(--text-muted); white-space: nowrap;">
+            Total: <strong style="color: var(--text-primary);">{{ filteredLogs.length }}</strong> log
+          </span>
+          <button 
+            class="btn btn-outline-danger btn-sm" 
+            @click="clearLogs"
+            :disabled="logs.length === 0"
+            title="Hapus seluruh histori log akses"
           >
-            Semua
-          </button>
-          <button
-            class="btn btn-sm"
-            :class="statusFilter === '2xx' ? 'btn-primary' : 'btn-secondary'"
-            @click="statusFilter = '2xx'"
-          >
-            2xx Success
-          </button>
-          <button
-            class="btn btn-sm"
-            :class="statusFilter === '4xx' ? 'btn-primary' : 'btn-secondary'"
-            @click="statusFilter = '4xx'"
-          >
-            4xx Client Error
-          </button>
-          <button
-            class="btn btn-sm"
-            :class="statusFilter === '5xx' ? 'btn-primary' : 'btn-secondary'"
-            @click="statusFilter = '5xx'"
-          >
-            5xx Server Error
+            🗑️ Bersihkan Log
           </button>
         </div>
       </div>
