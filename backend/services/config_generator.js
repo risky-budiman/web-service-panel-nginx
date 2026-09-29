@@ -98,15 +98,22 @@ server {
         proxy_set_header X-Forwarded-Host $host;
         proxy_set_header HTTPS on;
 
+        # Mencegah kompresi gzip dari backend agar sub_filter dapat mengubah link http ke https
+        proxy_set_header Accept-Encoding "";
+
         # Redirect rewrite agar tidak looping atau kembali ke http
         proxy_redirect http:// https://;
-        proxy_cookie_path / "/; Secure; SameSite=Lax";
+        proxy_cookie_path / "/; Secure; SameSite=None";
         proxy_buffering off;
+
+        # Header Browser CSP: otomatis ubah semua link aset internal http:// menjadi https://
+        add_header Content-Security-Policy "upgrade-insecure-requests" always;
 
         # Otomatis ubah mixed-content dari backend http:// ke https://
         sub_filter 'http://${proxy.domain_name}' 'https://${proxy.domain_name}';
+        sub_filter 'http:\\/\\/${proxy.domain_name}' 'https:\\/\\/${proxy.domain_name}';
         sub_filter_once off;
-        sub_filter_types text/html text/css text/javascript application/javascript application/json;
+        sub_filter_types text/html text/css text/xml text/javascript application/javascript application/x-javascript application/json;
 
         # WebSocket support
         proxy_set_header Upgrade $http_upgrade;
