@@ -74,19 +74,46 @@ sudo npm install -g pm2
 
 ---
 
-## 3. Menyiapkan Berkas Aplikasi di VPS
+## 3. Mengambil Kode Proyek dari GitHub & Setup di VPS
 
-### Langkah 3.1: Buat Folder Proyek
+Repository GitHub Anda:  
+👉 `https://github.com/risky-budiman/web-service-panel-nginx.git`
+
+### Langkah 3.1: Clone Repository ke Folder `/var/www/`
+Jalankan perintah ini di terminal VPS Ubuntu Anda:
+
 ```bash
-sudo mkdir -p /var/www/nginx-panel
+# Pindah ke direktori web server
+cd /var/www
+
+# Clone repository langsung dari GitHub
+sudo git clone https://github.com/risky-budiman/web-service-panel-nginx.git nginx-panel
+
+# Berikan hak akses folder ke user saat ini
 sudo chown -R $USER:$USER /var/www/nginx-panel
+
+# Masuk ke folder proyek
 cd /var/www/nginx-panel
 ```
 
-### Langkah 3.2: Upload / Salin Berkas Proyek
-Salin seluruh file proyek (folder `backend/`, `frontend/`, `deploy.sh`, dll.) ke folder `/var/www/nginx-panel`.
+---
 
-### Langkah 3.3: Kompilasi Frontend
+### Langkah 3.2: Opsi A — Deploy Otomatis (Sangat Direkomendasikan)
+Karena di dalam repositori sudah ada file `deploy.sh`, Anda cukup menjalankan:
+
+```bash
+chmod +x deploy.sh
+./deploy.sh
+```
+*Script ini akan otomatis mengompilasi frontend, menginstall backend, mengatur folder Nginx, dan menyalakan PM2.*
+
+---
+
+### Langkah 3.3: Opsi B — Setup Manual (Langkah demi Langkah)
+
+Jika ingin menjalankan secara manual:
+
+#### 1. Kompilasi Frontend
 ```bash
 cd /var/www/nginx-panel/frontend
 npm install
@@ -94,7 +121,7 @@ npm run build
 ```
 *Hasil kompilasi akan otomatis berada di `/var/www/nginx-panel/frontend/dist`.*
 
-### Langkah 3.4: Siapkan Backend & Environment
+#### 2. Siapkan Backend & Environment
 ```bash
 cd /var/www/nginx-panel/backend
 npm install --production
@@ -113,6 +140,23 @@ NGINX_CONF_DIR=/etc/nginx/panel-conf.d
 *Simpan dengan menekan `Ctrl + O`, lalu `Enter`, dan keluar dengan `Ctrl + X`.*
 
 ---
+
+### 🔄 Cara Mengambil Update Kode Terbaru di Kemudian Hari (`git pull`)
+Jika sewaktu-waktu Anda memperbarui kode di komputer lokal dan telah melakukan `git push`, cukup jalankan perintah berikut di VPS Anda:
+
+```bash
+cd /var/www/nginx-panel
+
+# 1. Tarik pembaruan dari GitHub (Data database panel.db di backend/data/ aman dan tidak terhapus)
+git pull origin main
+
+# 2. Re-build frontend jika ada perubahan tampilan UI
+cd frontend && npm install && npm run build && cd ..
+
+# 3. Update backend & restart service di PM2
+cd backend && npm install --production && cd ..
+pm2 restart nginx-panel
+```
 
 ## 4. Mengonfigurasi Nginx untuk Web Panel
 
