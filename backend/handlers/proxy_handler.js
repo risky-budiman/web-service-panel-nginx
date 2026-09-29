@@ -53,9 +53,28 @@ async function createProxy(req, res) {
       });
     }
 
-    const proxy = ProxyModel.create({ domain_name, target_ip, target_port, ssl_enabled });
+    let proxy = ProxyModel.create({ domain_name, target_ip, target_port, ssl_enabled });
 
-    // Generate nginx config
+    // Jika SSL diaktifkan, otomatis terbitkan sertifikat via Certbot jika belum ada
+    if (proxy.ssl_enabled && process.platform === 'linux') {
+      try {
+        if (!systemExec.hasCertificate(proxy.domain_name)) {
+          console.log(`🔐 Mengambil sertifikat SSL otomatis untuk ${proxy.domain_name}...`);
+          // Generate config HTTP sementara agar verifikasi challenge Certbot berhasil
+          configGen.generateConfig({ ...proxy, ssl_enabled: 0 });
+          await systemExec.reloadNginx();
+
+          const certResult = await systemExec.obtainCertificate(proxy.domain_name);
+          if (!certResult.success) {
+            console.warn(`⚠️ Certbot gagal untuk ${proxy.domain_name}: ${certResult.message}`);
+          }
+        }
+      } catch (sslErr) {
+        console.error('Auto SSL warning:', sslErr.message);
+      }
+    }
+
+    // Generate nginx config definitif
     try {
       configGen.generateConfig(proxy);
       const result = await systemExec.reloadNginx();
@@ -68,7 +87,7 @@ async function createProxy(req, res) {
 
     res.status(201).json({
       success: true,
-      message: 'Proxy berhasil ditambahkan',
+      message: 'Proxy berhasil ditambahkan' + (proxy.ssl_enabled ? ' dan SSL otomatis diaktifkan' : ''),
       data: proxy
     });
   } catch (err) {
@@ -102,9 +121,28 @@ async function updateProxy(req, res) {
       configGen.removeConfig(existing.domain_name);
     }
 
-    const proxy = ProxyModel.update(req.params.id, { domain_name, target_ip, target_port, ssl_enabled });
+    let proxy = ProxyModel.update(req.params.id, { domain_name, target_ip, target_port, ssl_enabled });
 
-    // Re-generate nginx config
+    // Jika SSL diaktifkan, otomatis terbitkan sertifikat via Certbot jika belum ada
+    if (proxy.ssl_enabled && process.platform === 'linux') {
+      try {
+        if (!systemExec.hasCertificate(proxy.domain_name)) {
+          console.log(`🔐 Mengambil sertifikat SSL otomatis untuk ${proxy.domain_name}...`);
+          // Generate config HTTP sementara agar verifikasi challenge Certbot berhasil
+          configGen.generateConfig({ ...proxy, ssl_enabled: 0 });
+          await systemExec.reloadNginx();
+
+          const certResult = await systemExec.obtainCertificate(proxy.domain_name);
+          if (!certResult.success) {
+            console.warn(`⚠️ Certbot gagal untuk ${proxy.domain_name}: ${certResult.message}`);
+          }
+        }
+      } catch (sslErr) {
+        console.error('Auto SSL warning:', sslErr.message);
+      }
+    }
+
+    // Re-generate nginx config definitif
     try {
       configGen.generateConfig(proxy);
       await systemExec.reloadNginx();
@@ -114,7 +152,7 @@ async function updateProxy(req, res) {
 
     res.json({
       success: true,
-      message: 'Proxy berhasil diperbarui',
+      message: 'Proxy berhasil diperbarui' + (proxy.ssl_enabled ? ' dan SSL otomatis diaktifkan' : ''),
       data: proxy
     });
   } catch (err) {
