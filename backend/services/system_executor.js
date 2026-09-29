@@ -72,21 +72,23 @@ async function obtainCertificate(domain) {
   }
 
   try {
-    // Jalankan certbot dengan plugin nginx secara non-interaktif
-    const cmd = `sudo certbot certonly --nginx -d ${domain} --non-interactive --agree-tos --register-unsafely-without-email`;
+    console.log(`🚀 Menjalankan Certbot untuk domain: ${domain}...`);
+    // Jalankan certbot dengan plugin nginx
+    const cmd = `certbot certonly --nginx -d ${domain} --non-interactive --agree-tos --register-unsafely-without-email 2>&1`;
     const { stdout, stderr } = await execAsync(cmd);
     const output = stdout || stderr;
+    console.log(`📋 Hasil Certbot ${domain}:\n`, output);
 
     if (hasCertificate(domain)) {
       return { success: true, message: 'Sertifikat SSL berhasil diterbitkan oleh Let\'s Encrypt', output };
     } else {
-      return { success: false, message: 'Certbot selesai tetapi sertifikat tidak ditemukan', output };
+      return { success: false, message: 'Certbot selesai tetapi sertifikat belum ditemukan', output };
     }
   } catch (err) {
-    console.error('Certbot error:', err);
+    console.error(`❌ Certbot error untuk ${domain}:`, err.stdout || err.stderr || err.message);
     return {
       success: false,
-      message: 'Gagal menerbitkan sertifikat SSL: ' + (err.stderr || err.message),
+      message: 'Gagal menerbitkan sertifikat SSL: ' + (err.stdout || err.stderr || err.message),
       error: err.message
     };
   }
