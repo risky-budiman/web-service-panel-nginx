@@ -138,8 +138,13 @@ async function handleSubmit() {
     const data = err.response?.data
     if (data?.errors) {
       errors.value = data.errors
+    } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+      // Jika request timeout karena Certbot berjalan lama di server
+      window.__toast?.('Permintaan sedang diproses di server', 'info')
+      emit('saved')
+      emit('close')
     } else {
-      errors.value = [data?.message || 'Terjadi kesalahan']
+      errors.value = [data?.message || err.message || 'Terjadi kesalahan']
     }
   } finally {
     submitting.value = false
