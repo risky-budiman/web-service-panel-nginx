@@ -87,24 +87,35 @@ server {
         proxy_http_version 1.1;
 
         # Standard Proxy Headers
-        proxy_set_header Host $host;
+        proxy_set_header Host $http_host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Protocol https;
+        proxy_set_header X-Forwarded-Ssl on;
+        proxy_set_header X-Url-Scheme https;
         proxy_set_header X-Forwarded-Port 443;
         proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header HTTPS on;
 
-        proxy_redirect off;
+        # Redirect rewrite agar tidak looping atau kembali ke http
+        proxy_redirect http:// https://;
+        proxy_cookie_path / "/; Secure; SameSite=Lax";
         proxy_buffering off;
+
+        # Otomatis ubah mixed-content dari backend http:// ke https://
+        sub_filter 'http://${proxy.domain_name}' 'https://${proxy.domain_name}';
+        sub_filter_once off;
+        sub_filter_types text/html text/css text/javascript application/javascript application/json;
 
         # WebSocket support
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
 
         # Timeouts
-        proxy_connect_timeout 90s;
-        proxy_send_timeout 90s;
-        proxy_read_timeout 90s;
+        proxy_connect_timeout 120s;
+        proxy_send_timeout 120s;
+        proxy_read_timeout 120s;
     }
 }
 `;
