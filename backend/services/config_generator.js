@@ -113,7 +113,7 @@ server {
         sub_filter 'http://${proxy.domain_name}' 'https://${proxy.domain_name}';
         sub_filter 'http:\\/\\/${proxy.domain_name}' 'https:\\/\\/${proxy.domain_name}';
         sub_filter_once off;
-        sub_filter_types text/html text/css text/xml text/javascript application/javascript application/x-javascript application/json;
+        sub_filter_types text/css text/xml text/javascript application/javascript application/x-javascript application/json;
 
         # WebSocket support
         proxy_set_header Upgrade $http_upgrade;
