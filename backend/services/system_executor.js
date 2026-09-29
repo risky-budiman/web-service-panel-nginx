@@ -92,4 +92,21 @@ async function obtainCertificate(domain) {
   }
 }
 
+/**
+ * Cek status Nginx
+ */
+async function getNginxStatus() {
+  if (!isLinux) {
+    return { running: null, message: 'Status check hanya tersedia di Linux' };
+  }
+
+  try {
+    const { stdout } = await execAsync('systemctl is-active nginx');
+    const isActive = stdout.trim() === 'active';
+    return { running: isActive, message: isActive ? 'Nginx sedang berjalan' : 'Nginx tidak aktif' };
+  } catch (err) {
+    return { running: false, message: 'Nginx tidak aktif atau tidak terinstall' };
+  }
+}
+
 module.exports = { testConfig, reloadNginx, getNginxStatus, hasCertificate, obtainCertificate };
