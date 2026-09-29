@@ -1118,10 +1118,65 @@ tbody tr:last-child td {
   background: var(--bg-card);
 }
 
+/* ─── Access Logs Toolbar ───────────────────────────────── */
+.access-logs-toolbar {
+  overflow: hidden;
+}
+
+.logs-toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.logs-search-wrapper {
+  flex: 1;
+  min-width: 220px;
+  max-width: 380px;
+}
+
+.logs-filter-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.logs-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.logs-count-badge {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.logs-count-badge strong {
+  color: var(--text-primary);
+}
+
 /* ─── Responsive Media Queries ──────────────────────────── */
 @media (max-width: 1024px) {
   .page-content {
     padding: 24px 20px;
+  }
+
+  .logs-search-wrapper {
+    max-width: 100%;
+  }
+
+  .logs-actions-group {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
   }
 }
 
@@ -1237,6 +1292,38 @@ tbody tr:last-child td {
     margin: 16px;
     padding: 28px 20px;
   }
+
+  .access-logs-toolbar {
+    padding: 14px 14px !important;
+  }
+
+  .logs-toolbar-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .logs-search-wrapper {
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .logs-filter-group {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+    flex-wrap: nowrap;
+  }
+
+  .logs-actions-group {
+    width: 100%;
+    justify-content: space-between;
+    margin-left: 0;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+  }
 }
 
 @media (max-width: 480px) {
@@ -1251,5 +1338,15 @@ tbody tr:last-child td {
     white-space: nowrap;
     display: inline-block;
   }
+
+  .logs-actions-group {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .logs-count-badge {
+    font-size: 12px;
+  }
 }
+
 

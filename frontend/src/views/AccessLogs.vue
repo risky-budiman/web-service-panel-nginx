@@ -8,58 +8,58 @@
     </div>
 
     <!-- Filter & Action Toolbar -->
-    <div class="card" style="margin-bottom: 20px; padding: 16px 20px;">
-      <div style="display: flex; gap: 14px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
-        <!-- Left: Search and Status Badges -->
-        <div style="display: flex; gap: 12px; align-items: center; flex: 1; min-width: 300px; flex-wrap: wrap;">
-          <div style="flex: 1; min-width: 220px; max-width: 380px;">
-            <div class="input-icon-wrapper">
-              <span class="input-icon">🔍</span>
-              <input
-                v-model="searchQuery"
-                type="text"
-                class="form-input"
-                placeholder="Cari IP, status HTTP, endpoint path..."
-                style="padding: 8px 12px 8px 36px; font-size: 13px;"
-              />
-            </div>
-          </div>
-          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-            <button
-              class="btn btn-sm"
-              :class="statusFilter === 'all' ? 'btn-primary' : 'btn-secondary'"
-              @click="statusFilter = 'all'"
-            >
-              Semua
-            </button>
-            <button
-              class="btn btn-sm"
-              :class="statusFilter === '2xx' ? 'btn-primary' : 'btn-secondary'"
-              @click="statusFilter = '2xx'"
-            >
-              2xx Success
-            </button>
-            <button
-              class="btn btn-sm"
-              :class="statusFilter === '4xx' ? 'btn-primary' : 'btn-secondary'"
-              @click="statusFilter = '4xx'"
-            >
-              4xx Error
-            </button>
-            <button
-              class="btn btn-sm"
-              :class="statusFilter === '5xx' ? 'btn-primary' : 'btn-secondary'"
-              @click="statusFilter = '5xx'"
-            >
-              5xx Error
-            </button>
+    <div class="card access-logs-toolbar" style="margin-bottom: 20px; padding: 16px 20px;">
+      <div class="logs-toolbar-row">
+        <!-- Search Field -->
+        <div class="logs-search-wrapper">
+          <div class="input-icon-wrapper">
+            <span class="input-icon">🔍</span>
+            <input
+              v-model="searchQuery"
+              type="text"
+              class="form-input"
+              placeholder="Cari IP, status HTTP, endpoint path..."
+              style="padding: 8px 12px 8px 36px; font-size: 13px;"
+            />
           </div>
         </div>
 
-        <!-- Right: Actions & Log Counter -->
-        <div style="display: flex; align-items: center; gap: 14px; margin-left: auto;">
-          <span style="font-size: 12px; color: var(--text-muted); white-space: nowrap;">
-            Total: <strong style="color: var(--text-primary);">{{ filteredLogs.length }}</strong> log
+        <!-- Filter Badges -->
+        <div class="logs-filter-group">
+          <button
+            class="btn btn-sm"
+            :class="statusFilter === 'all' ? 'btn-primary' : 'btn-secondary'"
+            @click="statusFilter = 'all'"
+          >
+            Semua
+          </button>
+          <button
+            class="btn btn-sm"
+            :class="statusFilter === '2xx' ? 'btn-primary' : 'btn-secondary'"
+            @click="statusFilter = '2xx'"
+          >
+            2xx Success
+          </button>
+          <button
+            class="btn btn-sm"
+            :class="statusFilter === '4xx' ? 'btn-primary' : 'btn-secondary'"
+            @click="statusFilter = '4xx'"
+          >
+            4xx Error
+          </button>
+          <button
+            class="btn btn-sm"
+            :class="statusFilter === '5xx' ? 'btn-primary' : 'btn-secondary'"
+            @click="statusFilter = '5xx'"
+          >
+            5xx Error
+          </button>
+        </div>
+
+        <!-- Actions & Counter -->
+        <div class="logs-actions-group">
+          <span class="logs-count-badge">
+            Total: <strong>{{ filteredLogs.length }}</strong> log
           </span>
           <button 
             class="btn btn-outline-danger btn-sm" 
