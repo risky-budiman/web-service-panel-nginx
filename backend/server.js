@@ -15,8 +15,18 @@ const authHandler = require('./handlers/auth_handler');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Percayai proxy Nginx untuk mendeteksi header proto HTTPS
+app.set('trust proxy', 1);
+
 // ─── Middleware Global ──────────────────────────────────────
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(helmet({
+  contentSecurityPolicy: false,
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  }
+}));
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
