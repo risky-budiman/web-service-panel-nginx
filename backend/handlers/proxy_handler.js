@@ -92,7 +92,10 @@ async function createProxy(req, res) {
     });
   } catch (err) {
     console.error('Error creating proxy:', err);
-    res.status(500).json({ success: false, message: 'Gagal menambahkan proxy' });
+    res.status(500).json({
+      success: false,
+      message: 'Gagal memproses proxy: ' + (err.message || 'Terjadi kesalahan sistem')
+    });
   }
 }
 
