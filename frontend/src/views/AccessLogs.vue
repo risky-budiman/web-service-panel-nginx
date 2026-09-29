@@ -5,10 +5,7 @@
         <h3>📋 Access Logs</h3>
         <p class="section-desc">Pantau lalu lintas HTTP & akses reverse proxy Nginx secara real-time</p>
       </div>
-      <div style="display: flex; gap: 10px;">
-        <button class="btn btn-secondary btn-sm" @click="fetchLogs" :disabled="loading">
-          🔄 Refresh
-        </button>
+      <div>
         <button class="btn btn-danger btn-sm" @click="clearLogs">
           🗑️ Bersihkan Log
         </button>

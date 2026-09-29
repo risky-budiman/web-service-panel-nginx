@@ -5,19 +5,16 @@
         <h3>🔒 Sertifikat SSL / TLS</h3>
         <p class="section-desc">Kelola enkripsi HTTPS dan sertifikat SSL untuk domain Anda</p>
       </div>
-      <button class="btn btn-secondary btn-sm" @click="fetchData" :disabled="loading">
-        🔄 Refresh
-      </button>
     </div>
 
     <!-- Alert Info -->
-    <div class="card" style="margin-bottom: 24px; border-left: 4px solid var(--accent-primary); background: rgba(99, 102, 241, 0.05);">
+    <div class="card" style="margin-bottom: 24px; border-left: 4px solid var(--accent-primary); background: rgba(99, 102, 241, 0.05); padding: 18px 22px;">
       <div style="display: flex; gap: 14px; align-items: flex-start;">
         <span style="font-size: 24px;">ℹ️</span>
         <div>
           <h4 style="margin-bottom: 4px; font-size: 15px; color: var(--text-primary);">Otomasi SSL & HTTPS</h4>
           <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
-            Sertifikat SSL mengamankan lalu lintas dengan enkripsi TLS port 443. Di server VPS Linux produksi, Nginx Panel dapat mengintegrasikan sertifikat otomatis via Certbot (Let's Encrypt).
+            Sertifikat SSL mengamankan lalu lintas dengan enkripsi TLS port 443. Di server VPS Linux produksi, Nginx Panel mengintegrasikan penerbitan dan pembaruan otomatis via Certbot (Let's Encrypt).
           </p>
         </div>
       </div>
