@@ -123,6 +123,10 @@ async function startServer() {
     await initDb();
     console.log('✅ Database initialized');
 
+    // Otomatis pastikan blokir akses langsung IP publik aktif
+    const configGen = require('./services/config_generator');
+    configGen.generateDefaultCatchAll();
+
     // Start Express
     app.listen(PORT, () => {
       console.log('');
