@@ -17,13 +17,14 @@ class WafLogParser {
   }
 
   /**
-   * Ambil log serangan WAF
+    * Ambil log WAF
    * @param {Object} options
    * @param {string} options.domain - Filter per domain
    * @param {number} options.limit - Jumlah maksimal log yang dikembalikan (default: 100)
    * @param {string} options.search - Pencarian kata kunci
+   * @param {string} options.filter - 'all' | 'attacks' | 'non_attacks' | 'blocked'
    */
-  static async getLogs({ domain = null, limit = 100, search = null } = {}) {
+  static async getLogs({ domain = null, limit = 100, search = null, filter = 'all' } = {}) {
     if (!this.isLogAvailable()) {
       return {
         available: false,
@@ -33,9 +34,19 @@ class WafLogParser {
     }
 
     try {
-      const logs = await this.parseAuditLog(AUDIT_LOG_PATH, limit * 2);
+      const logs = await this.parseAuditLog(AUDIT_LOG_PATH, limit * 3);
       
       let filtered = logs;
+      
+      // Filter serangan vs non-serangan
+      if (filter === 'attacks') {
+        filtered = filtered.filter(l => l.is_attack);
+      } else if (filter === 'non_attacks') {
+        filtered = filtered.filter(l => !l.is_attack);
+      } else if (filter === 'blocked') {
+        filtered = filtered.filter(l => l.status_code === 403);
+      }
+
       if (domain) {
         filtered = filtered.filter(l => (l.domain || '').toLowerCase().includes(domain.toLowerCase()));
       }
@@ -66,13 +77,15 @@ class WafLogParser {
   }
 
   /**
-   * Hitung ringkasan statistik WAF (Total serangan, top IP penyerang, top Rules triggered)
+   * Hitung ringkasan statistik WAF (Total serangan nyata, top IP penyerang, top Rules triggered)
    */
   static async getStats() {
     if (!this.isLogAvailable()) {
       return {
         available: false,
         total_attacks: 0,
+        total_blocked: 0,
+        total_audit: 0,
         top_ips: [],
         top_rules: [],
         top_domains: []
@@ -85,17 +98,25 @@ class WafLogParser {
       const ipCounts = {};
       const ruleCounts = {};
       const domainCounts = {};
+      let totalAttacks = 0;
+      let totalBlocked = 0;
 
       for (const log of logs) {
-        if (log.client_ip) {
-          ipCounts[log.client_ip] = (ipCounts[log.client_ip] || 0) + 1;
+        if (log.is_attack) {
+          totalAttacks++;
+          if (log.client_ip) {
+            ipCounts[log.client_ip] = (ipCounts[log.client_ip] || 0) + 1;
+          }
+          if (log.rule_message || log.rule_id) {
+            const ruleKey = log.rule_message ? `${log.rule_message} (${log.rule_id})` : `Rule ID ${log.rule_id}`;
+            ruleCounts[ruleKey] = (ruleCounts[ruleKey] || 0) + 1;
+          }
+          if (log.domain) {
+            domainCounts[log.domain] = (domainCounts[log.domain] || 0) + 1;
+          }
         }
-        if (log.rule_message || log.rule_id) {
-          const ruleKey = log.rule_message ? `${log.rule_message} (${log.rule_id})` : `Rule ID ${log.rule_id}`;
-          ruleCounts[ruleKey] = (ruleCounts[ruleKey] || 0) + 1;
-        }
-        if (log.domain) {
-          domainCounts[log.domain] = (domainCounts[log.domain] || 0) + 1;
+        if (log.status_code === 403) {
+          totalBlocked++;
         }
       }
 
@@ -106,7 +127,9 @@ class WafLogParser {
 
       return {
         available: true,
-        total_attacks: logs.length,
+        total_attacks: totalAttacks,
+        total_blocked: totalBlocked,
+        total_audit: logs.length,
         top_ips: sortMap(ipCounts),
         top_rules: sortMap(ruleCounts),
         top_domains: sortMap(domainCounts)
@@ -115,6 +138,8 @@ class WafLogParser {
       return {
         available: true,
         total_attacks: 0,
+        total_blocked: 0,
+        total_audit: 0,
         error: err.message,
         top_ips: [],
         top_rules: [],
@@ -162,13 +187,15 @@ class WafLogParser {
             rule_id: '',
             rule_message: '',
             rule_data: '',
-            severity: 'WARNING'
+            severity: 'WARNING',
+            is_attack: false
           };
           currentSection = 'A';
           continue;
         } else if (section === 'Z') {
           // Entry selesai
           if (currentEntry) {
+            currentEntry.is_attack = Boolean(currentEntry.rule_id || currentEntry.rule_message);
             entries.push(currentEntry);
           }
           currentEntry = null;

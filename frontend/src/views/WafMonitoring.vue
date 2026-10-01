@@ -50,7 +50,15 @@
         <div class="stat-icon" style="background: rgba(239, 68, 68, 0.15); color: #ef4444;">🚨</div>
         <div class="stat-info">
           <h3>{{ stats.total_attacks || 0 }}</h3>
-          <p>Total Serangan Terdeteksi</p>
+          <p>Serangan Nyata Terdeteksi</p>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(239, 68, 68, 0.15); color: #f87171;">🛑</div>
+        <div class="stat-info">
+          <h3>{{ stats.total_blocked || 0 }}</h3>
+          <p>Serangan Diblokir (403)</p>
         </div>
       </div>
 
@@ -59,16 +67,6 @@
         <div class="stat-info">
           <h3>{{ stats.top_domains?.length || 0 }}</h3>
           <p>Target Domain Diserang</p>
-        </div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-icon" style="background: rgba(168, 85, 247, 0.15); color: #a855f7;">🛑</div>
-        <div class="stat-info">
-          <h3 style="font-size: 18px; line-height: 28px;">
-            {{ stats.top_rules?.[0]?.key ? (stats.top_rules[0].key.split('(')[1]?.replace(')', '') || 'None') : 'None' }}
-          </h3>
-          <p>Top Threat Rule ID</p>
         </div>
       </div>
 
@@ -136,7 +134,7 @@
     <div class="card access-logs-toolbar waf-toolbar" style="margin-bottom: 20px;">
       <div class="logs-toolbar-row waf-toolbar-row">
         <!-- Search Field -->
-        <div class="logs-search-wrapper" style="flex: 1; min-width: 220px;">
+        <div class="logs-search-wrapper" style="flex: 1; min-width: 200px;">
           <div class="input-icon-wrapper">
             <span class="input-icon">🔍</span>
             <input
@@ -148,6 +146,38 @@
               @keyup.enter="fetchLogs(false)"
             />
           </div>
+        </div>
+
+        <!-- Filter Classification Buttons -->
+        <div class="logs-filter-group waf-filter-group">
+          <button
+            class="btn btn-sm"
+            :class="categoryFilter === 'all' ? 'btn-primary' : 'btn-secondary'"
+            @click="setCategoryFilter('all')"
+          >
+            Semua Log
+          </button>
+          <button
+            class="btn btn-sm"
+            :class="categoryFilter === 'attacks' ? 'btn-primary' : 'btn-secondary'"
+            @click="setCategoryFilter('attacks')"
+          >
+            🛑 Serangan Nyata
+          </button>
+          <button
+            class="btn btn-sm"
+            :class="categoryFilter === 'blocked' ? 'btn-primary' : 'btn-secondary'"
+            @click="setCategoryFilter('blocked')"
+          >
+            🚫 Blocked (403)
+          </button>
+          <button
+            class="btn btn-sm"
+            :class="categoryFilter === 'non_attacks' ? 'btn-primary' : 'btn-secondary'"
+            @click="setCategoryFilter('non_attacks')"
+          >
+            ℹ️ Non-Serangan
+          </button>
         </div>
 
         <!-- Filter Action -->
@@ -171,8 +201,8 @@
 
       <div v-else-if="!logData.logs || logData.logs.length === 0" class="empty-state" style="padding: 40px;">
         <div class="empty-state-icon">🛡️</div>
-        <h3>Tidak Ada Event Serangan Ditemukan</h3>
-        <p>Server dalam kondisi aman atau belum ada request mencurigakan yang cocok.</p>
+        <h3>Tidak Ada Event Ditemukan</h3>
+        <p>Tidak ada data log yang cocok dengan filter yang dipilih.</p>
       </div>
 
       <div v-else class="table-wrapper">
@@ -180,17 +210,34 @@
           <thead>
             <tr>
               <th style="min-width: 140px;">Waktu</th>
-              <th style="min-width: 130px;">IP Penyerang</th>
-              <th style="min-width: 140px;">Target Host</th>
-              <th style="min-width: 200px;">Endpoint / Method</th>
-              <th style="min-width: 260px;">Rule Serangan Terdeteksi</th>
-              <th style="min-width: 110px; text-align: center;">Tindakan</th>
+              <th style="min-width: 120px;">Tipe Event</th>
+              <th style="min-width: 130px;">IP Pengakses</th>
+              <th style="min-width: 130px;">Target Host</th>
+              <th style="min-width: 180px;">Endpoint / Method</th>
+              <th style="min-width: 250px;">Aturan / Indikasi</th>
+              <th style="min-width: 120px; text-align: center;">Tindakan Sistem</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="log in logData.logs" :key="log.id">
               <td style="font-size: 12px; color: var(--text-muted); white-space: nowrap;">
                 {{ log.timestamp || '-' }}
+              </td>
+              <td>
+                <span 
+                  v-if="log.is_attack" 
+                  class="badge" 
+                  style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); font-weight: 600;"
+                >
+                  🛑 Serangan
+                </span>
+                <span 
+                  v-else 
+                  class="badge" 
+                  style="background: rgba(148, 163, 184, 0.15); color: var(--text-secondary); border: 1px solid var(--border-color);"
+                >
+                  ℹ️ Info / HTTP Error
+                </span>
               </td>
               <td>
                 <span class="waf-ip-code">
@@ -202,7 +249,7 @@
                   {{ log.domain || '-' }}
                 </span>
               </td>
-              <td style="max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                 <span class="badge" style="background: rgba(148, 163, 184, 0.15); margin-right: 6px; font-size: 11px;">
                   {{ log.method || 'GET' }}
                 </span>
@@ -210,22 +257,37 @@
                   {{ log.uri || '/' }}
                 </span>
               </td>
-              <td style="max-width: 320px;">
-                <div style="font-size: 13px; font-weight: 600; color: #f87171; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" :title="log.rule_message">
-                  {{ log.rule_message || 'Suspicious Traffic Detected' }}
-                </div>
-                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
-                  Rule ID: <span style="font-family: monospace; color: var(--text-secondary);">{{ log.rule_id || '-' }}</span> 
-                  &nbsp;|&nbsp; Sev: <span style="font-weight: 600;">{{ log.severity }}</span>
-                </div>
+              <td style="max-width: 280px;">
+                <template v-if="log.is_attack">
+                  <div style="font-size: 13px; font-weight: 600; color: #f87171; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" :title="log.rule_message">
+                    {{ log.rule_message || 'Suspicious Traffic Detected' }}
+                  </div>
+                  <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                    Rule ID: <span style="font-family: monospace; color: var(--text-secondary); font-weight: 600;">{{ log.rule_id || '-' }}</span> 
+                    &nbsp;|&nbsp; Sev: <span style="font-weight: 600;">{{ log.severity }}</span>
+                  </div>
+                </template>
+                <template v-else>
+                  <div style="font-size: 12px; color: var(--text-muted); font-style: italic;">
+                    Tidak ada rule serangan WAF yang ter-trigger (audit log HTTP biasa)
+                  </div>
+                </template>
               </td>
               <td style="text-align: center;">
                 <span 
                   v-if="log.status_code === 403" 
                   class="badge" 
-                  style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3);"
+                  style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); font-weight: 600;"
+                  title="Permintaan penyerang berhasil ditolak mentah-mentah oleh ModSecurity"
                 >
-                  🛑 Blocked (403)
+                  🛑 DIBLOKIR (403)
+                </span>
+                <span 
+                  v-else-if="log.status_code >= 500" 
+                  class="badge" 
+                  style="background: rgba(239, 68, 68, 0.1); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.2);"
+                >
+                  💥 Server Error ({{ log.status_code }})
                 </span>
                 <span 
                   v-else 
@@ -252,8 +314,11 @@ const autoRefresh = ref(false)
 let pollTimer = null
 
 const searchQuery = ref('')
+const categoryFilter = ref('all')
 const stats = ref({
   total_attacks: 0,
+  total_blocked: 0,
+  total_audit: 0,
   top_ips: [],
   top_rules: [],
   top_domains: []
@@ -262,6 +327,11 @@ const logData = ref({
   available: true,
   logs: []
 })
+
+function setCategoryFilter(val) {
+  categoryFilter.value = val
+  fetchLogs(false)
+}
 
 function toggleAutoRefresh() {
   autoRefresh.value = !autoRefresh.value
@@ -292,6 +362,7 @@ async function fetchLogs(silent = false) {
   try {
     const res = await api.getWafLogs({
       search: searchQuery.value || undefined,
+      filter: categoryFilter.value,
       limit: 100
     })
     if (res.data?.success) {
@@ -461,6 +532,13 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.waf-filter-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .waf-table {

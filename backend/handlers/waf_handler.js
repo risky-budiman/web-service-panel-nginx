@@ -8,13 +8,14 @@ const systemExec = require('../services/system_executor');
  */
 async function getWafLogs(req, res) {
   try {
-    const { domain, limit, search } = req.query;
+    const { domain, limit, search, filter } = req.query;
     const parsedLimit = parseInt(limit, 10) || 50;
 
     const result = await WafLogParser.getLogs({
       domain: domain || null,
       limit: Math.min(parsedLimit, 200),
-      search: search || null
+      search: search || null,
+      filter: filter || 'all'
     });
 
     res.json({
