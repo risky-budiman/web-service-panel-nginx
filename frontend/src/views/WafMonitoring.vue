@@ -322,6 +322,8 @@ onUnmounted(() => {
 .waf-monitoring-view {
   width: 100%;
   max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .waf-header-row {
@@ -331,6 +333,7 @@ onUnmounted(() => {
   gap: 16px;
   flex-wrap: wrap;
   margin-bottom: 20px;
+  width: 100%;
 }
 
 .waf-title {
@@ -347,6 +350,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .waf-alert-card {
@@ -367,6 +371,7 @@ onUnmounted(() => {
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   margin-bottom: 24px;
+  width: 100%;
 }
 
 .waf-summary-grid {
@@ -374,12 +379,15 @@ onUnmounted(() => {
   grid-template-columns: repeat(2, 1fr);
   gap: 16px;
   margin-bottom: 24px;
+  width: 100%;
 }
 
 .waf-card {
   padding: 20px;
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  width: 100%;
 }
 
 .waf-card-title {
@@ -404,6 +412,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  width: 100%;
 }
 
 .waf-list-item {
@@ -415,6 +424,7 @@ onUnmounted(() => {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   gap: 10px;
+  min-width: 0;
 }
 
 .waf-ip-code {
@@ -459,9 +469,15 @@ onUnmounted(() => {
 }
 
 /* ─── Responsive Breakpoints ────────────────────────────── */
-@media (max-width: 1024px) {
+@media (max-width: 1440px) {
   .waf-stats-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .waf-summary-grid {
+    grid-template-columns: 1fr;
   }
 }
 
