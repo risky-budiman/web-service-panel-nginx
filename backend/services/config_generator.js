@@ -30,7 +30,10 @@ function getModSecDirectives(wafMode) {
     modsecurity_rules 'SecRuleEngine DetectionOnly';
 `;
   }
-  return '';
+  return `
+    # ModSecurity Web Application Firewall (WAF) - Disabled
+    modsecurity off;
+`;
 }
 
 /**
