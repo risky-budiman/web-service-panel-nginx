@@ -42,7 +42,7 @@ function getProxyById(req, res) {
  */
 async function createProxy(req, res) {
   try {
-    const { domain_name, target_ip, target_port, ssl_enabled } = req.body;
+    const { domain_name, target_ip, target_port, ssl_enabled, waf_mode } = req.body;
 
     // Cek duplikat domain
     const existing = ProxyModel.getByDomain(domain_name);
@@ -53,7 +53,7 @@ async function createProxy(req, res) {
       });
     }
 
-    let proxy = ProxyModel.create({ domain_name, target_ip, target_port, ssl_enabled });
+    let proxy = ProxyModel.create({ domain_name, target_ip, target_port, ssl_enabled, waf_mode });
 
     // Jika SSL diaktifkan, otomatis terbitkan sertifikat via Certbot jika belum ada
     if (proxy.ssl_enabled && process.platform === 'linux') {
@@ -109,7 +109,7 @@ async function updateProxy(req, res) {
       return res.status(404).json({ success: false, message: 'Proxy tidak ditemukan' });
     }
 
-    const { domain_name, target_ip, target_port, ssl_enabled } = req.body;
+    const { domain_name, target_ip, target_port, ssl_enabled, waf_mode } = req.body;
 
     // Cek duplikat domain (jika domain berubah)
     if (domain_name && domain_name !== existing.domain_name) {
@@ -124,7 +124,7 @@ async function updateProxy(req, res) {
       configGen.removeConfig(existing.domain_name);
     }
 
-    let proxy = ProxyModel.update(req.params.id, { domain_name, target_ip, target_port, ssl_enabled });
+    let proxy = ProxyModel.update(req.params.id, { domain_name, target_ip, target_port, ssl_enabled, waf_mode });
 
     // Jika SSL diaktifkan, otomatis terbitkan sertifikat via Certbot jika belum ada
     if (proxy.ssl_enabled && process.platform === 'linux') {

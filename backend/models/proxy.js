@@ -4,9 +4,12 @@ class ProxyModel {
   /**
    * Ambil semua proxy hosts
    */
+  /**
+   * Ambil semua proxy hosts
+   */
   static getAll() {
     return queryAll(`
-      SELECT id, domain_name, target_ip, target_port, ssl_enabled, status, created_at, updated_at
+      SELECT id, domain_name, target_ip, target_port, ssl_enabled, waf_mode, status, created_at, updated_at
       FROM proxy_hosts
       ORDER BY created_at DESC
     `);
@@ -29,11 +32,12 @@ class ProxyModel {
   /**
    * Buat proxy baru
    */
-  static create({ domain_name, target_ip, target_port, ssl_enabled = false }) {
+  static create({ domain_name, target_ip, target_port, ssl_enabled = false, waf_mode = 'off' }) {
     const db = getDb();
+    const validWaf = ['off', 'detection', 'on'].includes(waf_mode) ? waf_mode : 'off';
     db.run(
-      `INSERT INTO proxy_hosts (domain_name, target_ip, target_port, ssl_enabled, status) VALUES (?, ?, ?, ?, 'active')`,
-      [domain_name, target_ip, target_port, ssl_enabled ? 1 : 0]
+      `INSERT INTO proxy_hosts (domain_name, target_ip, target_port, ssl_enabled, waf_mode, status) VALUES (?, ?, ?, ?, ?, 'active')`,
+      [domain_name, target_ip, target_port, ssl_enabled ? 1 : 0, validWaf]
     );
     saveDb();
 
@@ -44,7 +48,7 @@ class ProxyModel {
   /**
    * Update proxy
    */
-  static update(id, { domain_name, target_ip, target_port, ssl_enabled }) {
+  static update(id, { domain_name, target_ip, target_port, ssl_enabled, waf_mode }) {
     const fields = [];
     const values = [];
 
@@ -52,6 +56,9 @@ class ProxyModel {
     if (target_ip !== undefined) { fields.push('target_ip = ?'); values.push(target_ip); }
     if (target_port !== undefined) { fields.push('target_port = ?'); values.push(target_port); }
     if (ssl_enabled !== undefined) { fields.push('ssl_enabled = ?'); values.push(ssl_enabled ? 1 : 0); }
+    if (waf_mode !== undefined && ['off', 'detection', 'on'].includes(waf_mode)) {
+      fields.push('waf_mode = ?'); values.push(waf_mode);
+    }
 
     if (fields.length === 0) return this.getById(id);
 
@@ -112,8 +119,9 @@ class ProxyModel {
     const inactive = queryOne("SELECT COUNT(*) as c FROM proxy_hosts WHERE status = 'inactive'")?.c || 0;
     const error = queryOne("SELECT COUNT(*) as c FROM proxy_hosts WHERE status = 'error'")?.c || 0;
     const sslEnabled = queryOne("SELECT COUNT(*) as c FROM proxy_hosts WHERE ssl_enabled = 1")?.c || 0;
+    const wafActive = queryOne("SELECT COUNT(*) as c FROM proxy_hosts WHERE waf_mode IN ('on', 'detection')")?.c || 0;
 
-    return { total, active, inactive, error, ssl_enabled: sslEnabled };
+    return { total, active, inactive, error, ssl_enabled: sslEnabled, waf_active: wafActive };
   }
 }
 

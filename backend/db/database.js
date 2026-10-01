@@ -110,11 +110,24 @@ function initializeSchema() {
       target_ip TEXT NOT NULL,
       target_port INTEGER NOT NULL DEFAULT 80,
       ssl_enabled INTEGER NOT NULL DEFAULT 0,
+      waf_mode TEXT NOT NULL DEFAULT 'off' CHECK(waf_mode IN ('off', 'detection', 'on')),
       status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'inactive', 'error')),
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Safe migration: tambahkan kolom waf_mode jika belum ada (untuk database yang sudah ada)
+  try {
+    const tableInfo = queryAll("PRAGMA table_info(proxy_hosts)");
+    const hasWafMode = tableInfo.some(col => col.name === 'waf_mode');
+    if (!hasWafMode) {
+      db.run("ALTER TABLE proxy_hosts ADD COLUMN waf_mode TEXT NOT NULL DEFAULT 'off'");
+      console.log("🛡️ Migrasi database sukses: kolom 'waf_mode' berhasil ditambahkan.");
+    }
+  } catch (err) {
+    console.warn("Notice checking table migration:", err.message);
+  }
 
   db.run(`
     CREATE TABLE IF NOT EXISTS users (

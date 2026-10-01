@@ -47,10 +47,16 @@ export default {
   // SSL
   getSslCertificates: () => api.get('/ssl'),
   requestSsl: (proxy_id) => api.post('/ssl/request', { proxy_id }),
+  toggleSsl: (id) => api.patch(`/ssl/${id}/toggle`),
 
   // Logs
   getLogs: (domain, limit) => api.get('/logs', { params: { domain, limit } }),
   clearLogs: (domain) => api.delete('/logs/clear', { data: { domain } }),
+
+  // ModSecurity WAF
+  getWafLogs: (params) => api.get('/waf/logs', { params }),
+  getWafStats: () => api.get('/waf/stats'),
+  setWafMode: (id, waf_mode) => api.patch(`/waf/${id}/mode`, { waf_mode }),
 
   // Settings
   getSystemInfo: () => api.get('/settings/system'),

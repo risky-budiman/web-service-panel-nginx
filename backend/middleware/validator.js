@@ -46,6 +46,10 @@ function validateProxyInput(req, res, next) {
   req.body.domain_name = domain_name.trim().toLowerCase();
   req.body.target_ip = target_ip.trim();
   req.body.target_port = parseInt(target_port, 10);
+  if (req.body.waf_mode !== undefined) {
+    const validModes = ['off', 'detection', 'on'];
+    req.body.waf_mode = validModes.includes(req.body.waf_mode) ? req.body.waf_mode : 'off';
+  }
 
   next();
 }

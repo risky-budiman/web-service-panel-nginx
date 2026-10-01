@@ -74,22 +74,26 @@
               </span>
             </td>
             <td style="text-align: right;">
-              <button
-                v-if="!cert.ssl_enabled"
-                class="btn btn-primary btn-sm"
-                :disabled="actionLoading === cert.id"
-                @click="enableSsl(cert)"
-              >
-                {{ actionLoading === cert.id ? 'Memproses...' : '🔐 Aktifkan SSL' }}
-              </button>
-              <button
-                v-else
-                class="btn btn-secondary btn-sm"
-                :disabled="actionLoading === cert.id"
-                @click="enableSsl(cert)"
-              >
-                {{ actionLoading === cert.id ? 'Memproses...' : '🔄 Perbarui SSL' }}
-              </button>
+              <div style="display: flex; gap: 8px; justify-content: flex-end; align-items: center;">
+                <label class="toggle" :title="cert.ssl_enabled ? 'Nonaktifkan HTTPS' : 'Aktifkan HTTPS'">
+                  <input 
+                    type="checkbox" 
+                    :checked="cert.ssl_enabled" 
+                    :disabled="actionLoading === cert.id"
+                    @change="toggleSslStatus(cert)" 
+                  />
+                  <span class="toggle-slider"></span>
+                </label>
+                <button
+                  v-if="cert.ssl_enabled"
+                  class="btn btn-secondary btn-sm"
+                  :disabled="actionLoading === cert.id"
+                  @click="enableSsl(cert)"
+                  title="Perbarui sertifikat Let's Encrypt"
+                >
+                  {{ actionLoading === cert.id ? 'Memproses...' : '🔄 Renew' }}
+                </button>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -131,6 +135,19 @@ async function enableSsl(cert) {
     fetchData()
   } catch (err) {
     window.__toast?.(err.response?.data?.message || 'Gagal mengaktifkan SSL', 'error')
+  } finally {
+    actionLoading.value = null
+  }
+}
+
+async function toggleSslStatus(cert) {
+  actionLoading.value = cert.id
+  try {
+    const res = await api.toggleSsl(cert.id)
+    window.__toast?.(res.data.message, 'success')
+    fetchData()
+  } catch (err) {
+    window.__toast?.(err.response?.data?.message || 'Gagal mengubah status SSL', 'error')
   } finally {
     actionLoading.value = null
   }

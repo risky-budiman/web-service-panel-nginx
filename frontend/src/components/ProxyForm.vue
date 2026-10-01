@@ -81,6 +81,45 @@
               </div>
             </div>
 
+            <!-- ModSecurity WAF Option as Segmented Toggle -->
+            <div class="form-group">
+              <label class="form-label">
+                <span>🛡️ Proteksi WAF (ModSecurity)</span>
+              </label>
+              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 4px;">
+                <button
+                  type="button"
+                  :class="['btn btn-sm', form.waf_mode === 'off' ? 'btn-primary' : 'btn-secondary']"
+                  style="padding: 10px; font-size: 13px; font-weight: 600; display: flex; flex-direction: column; align-items: center; gap: 4px;"
+                  @click="form.waf_mode = 'off'"
+                >
+                  <span>⚪ Off</span>
+                  <span style="font-size: 10px; opacity: 0.8; font-weight: normal;">Tanpa WAF</span>
+                </button>
+                <button
+                  type="button"
+                  :class="['btn btn-sm', form.waf_mode === 'detection' ? 'btn-primary' : 'btn-secondary']"
+                  style="padding: 10px; font-size: 13px; font-weight: 600; display: flex; flex-direction: column; align-items: center; gap: 4px;"
+                  @click="form.waf_mode = 'detection'"
+                >
+                  <span>⚠️ Detection</span>
+                  <span style="font-size: 10px; opacity: 0.8; font-weight: normal;">Log Ancaman</span>
+                </button>
+                <button
+                  type="button"
+                  :class="['btn btn-sm', form.waf_mode === 'on' ? 'btn-primary' : 'btn-secondary']"
+                  style="padding: 10px; font-size: 13px; font-weight: 600; display: flex; flex-direction: column; align-items: center; gap: 4px;"
+                  @click="form.waf_mode = 'on'"
+                >
+                  <span>🛡️ Enforce</span>
+                  <span style="font-size: 10px; opacity: 0.8; font-weight: normal;">Blokir 403</span>
+                </button>
+              </div>
+              <p class="form-hint" style="margin-top: 6px;">
+                {{ form.waf_mode === 'on' ? 'Aktif memblokir SQL Injection, XSS, Path Traversal, Bot jahat (HTTP 403).' : (form.waf_mode === 'detection' ? 'Memonitor & mencatat seluruh serangan tanpa memutus koneksi.' : 'Tidak ada inspeksi paket ModSecurity pada domain ini.') }}
+              </p>
+            </div>
+
             <div v-if="errors.length > 0" style="margin-top: 8px;">
               <p v-for="err in errors" :key="err" class="form-error">⚠️ {{ err }}</p>
             </div>
@@ -117,7 +156,8 @@ const form = reactive({
   domain_name: props.proxy?.domain_name || '',
   target_ip: props.proxy?.target_ip || '',
   target_port: props.proxy?.target_port || 80,
-  ssl_enabled: props.proxy?.ssl_enabled ? true : false
+  ssl_enabled: props.proxy?.ssl_enabled ? true : false,
+  waf_mode: props.proxy?.waf_mode || 'off'
 })
 
 async function handleSubmit() {

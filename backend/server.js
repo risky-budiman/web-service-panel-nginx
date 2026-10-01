@@ -61,11 +61,18 @@ app.get('/api/stats', authMiddleware, proxyHandler.getStats);
 const sslHandler = require('./handlers/ssl_handler');
 app.get('/api/ssl', authMiddleware, sslHandler.getSslCertificates);
 app.post('/api/ssl/request', authMiddleware, sslHandler.requestSsl);
+app.patch('/api/ssl/:id/toggle', authMiddleware, sslHandler.toggleSsl);
 
 // ─── API Routes: Access Logs ────────────────────────────────
 const logsHandler = require('./handlers/logs_handler');
 app.get('/api/logs', authMiddleware, logsHandler.getLogs);
 app.delete('/api/logs/clear', authMiddleware, logsHandler.clearLogs);
+
+// ─── API Routes: ModSecurity WAF ────────────────────────────
+const wafHandler = require('./handlers/waf_handler');
+app.get('/api/waf/logs', authMiddleware, wafHandler.getWafLogs);
+app.get('/api/waf/stats', authMiddleware, wafHandler.getWafStats);
+app.patch('/api/waf/:id/mode', authMiddleware, wafHandler.setWafMode);
 
 // ─── API Routes: Settings & System ──────────────────────────
 const settingsHandler = require('./handlers/settings_handler');

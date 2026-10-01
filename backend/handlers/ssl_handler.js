@@ -78,7 +78,56 @@ async function requestSsl(req, res) {
   }
 }
 
+/**
+ * PATCH /api/ssl/:id/toggle — Toggle SSL aktif / nonaktif
+ */
+async function toggleSsl(req, res) {
+  try {
+    const { id } = req.params;
+    const proxy = ProxyModel.getById(id);
+
+    if (!proxy) {
+      return res.status(404).json({ success: false, message: 'Proxy domain tidak ditemukan' });
+    }
+
+    const nextSsl = proxy.ssl_enabled ? 0 : 1;
+
+    // Jika ingin mengaktifkan SSL dan di Linux, periksa sertifikat
+    if (nextSsl && process.platform === 'linux') {
+      if (!systemExec.hasCertificate(proxy.domain_name)) {
+        const certResult = await systemExec.obtainCertificate(proxy.domain_name);
+        if (!certResult.success) {
+          return res.status(500).json({
+            success: false,
+            message: certResult.message || 'Gagal menerbitkan sertifikat Let\'s Encrypt'
+          });
+        }
+      }
+    }
+
+    const updated = ProxyModel.update(id, { ssl_enabled: nextSsl });
+
+    // Perbarui konfigurasi Nginx dan reload
+    try {
+      configGen.generateConfig(updated);
+      await systemExec.reloadNginx();
+    } catch (configErr) {
+      console.error('Config reload error during SSL toggle:', configErr.message);
+    }
+
+    res.json({
+      success: true,
+      message: `SSL untuk ${updated.domain_name} berhasil ${nextSsl ? 'diaktifkan (HTTPS)' : 'dinonaktifkan (HTTP)'}`,
+      data: updated
+    });
+  } catch (err) {
+    console.error('Error toggleSsl:', err);
+    res.status(500).json({ success: false, message: 'Gagal mengubah status SSL: ' + err.message });
+  }
+}
+
 module.exports = {
   getSslCertificates,
-  requestSsl
+  requestSsl,
+  toggleSsl
 };

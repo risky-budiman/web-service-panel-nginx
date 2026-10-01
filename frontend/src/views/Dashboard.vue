@@ -46,6 +46,14 @@
         </a>
         <a
           class="sidebar-nav-item"
+          :class="{ active: currentTab === 'waf' }"
+          href="#"
+          @click.prevent="currentTab = 'waf'; sidebarOpen = false"
+        >
+          🛡️ WAF Monitoring
+        </a>
+        <a
+          class="sidebar-nav-item"
           :class="{ active: currentTab === 'logs' }"
           href="#"
           @click.prevent="currentTab = 'logs'; sidebarOpen = false"
@@ -84,6 +92,7 @@
           <h2 class="topbar-title">
             <span v-if="currentTab === 'dashboard'">📊 Dashboard Proxy</span>
             <span v-else-if="currentTab === 'ssl'">🔒 Sertifikat SSL</span>
+            <span v-else-if="currentTab === 'waf'">🛡️ WAF & Security Monitoring</span>
             <span v-else-if="currentTab === 'logs'">📋 Nginx Access Logs</span>
             <span v-else-if="currentTab === 'settings'">⚙️ Pengaturan Sistem</span>
           </h2>
@@ -100,6 +109,9 @@
 
       <!-- View: SSL Certificates -->
       <SslCertificates v-if="currentTab === 'ssl'" :key="'ssl-' + refreshKey" />
+
+      <!-- View: WAF Monitoring -->
+      <WafMonitoring v-else-if="currentTab === 'waf'" :key="'waf-' + refreshKey" />
 
       <!-- View: Access Logs -->
       <AccessLogs v-else-if="currentTab === 'logs'" :key="'logs-' + refreshKey" />
@@ -146,6 +158,13 @@
               <p>SSL Enabled</p>
             </div>
           </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">🛡️</div>
+            <div class="stat-info">
+              <h3>{{ stats.waf_active || 0 }}</h3>
+              <p>WAF Active</p>
+            </div>
+          </div>
         </div>
 
         <!-- Proxy Table -->
@@ -180,6 +199,7 @@
                   <th>Domain</th>
                   <th>Target</th>
                   <th>SSL</th>
+                  <th>WAF Mode</th>
                   <th>Status</th>
                   <th>Dibuat</th>
                   <th>Aksi</th>
@@ -190,9 +210,51 @@
                   <td class="domain-cell">{{ proxy.domain_name }}</td>
                   <td class="ip-cell">{{ proxy.target_ip }}:{{ proxy.target_port }}</td>
                   <td>
-                    <span :class="['ssl-badge', proxy.ssl_enabled ? 'enabled' : 'disabled']">
-                      {{ proxy.ssl_enabled ? '🔒 HTTPS' : '🔓 HTTP' }}
-                    </span>
+                    <button
+                      type="button"
+                      :class="['ssl-badge', proxy.ssl_enabled ? 'enabled' : 'disabled']"
+                      style="cursor: pointer; border-radius: 20px;"
+                      :title="proxy.ssl_enabled ? 'Enkripsi HTTPS Aktif. Klik untuk beralih ke HTTP' : 'HTTP Saja. Klik untuk aktifkan HTTPS / SSL'"
+                      @click="handleToggleSsl(proxy)"
+                    >
+                      <span 
+                        style="width: 6px; height: 6px; border-radius: 50%; display: inline-block;" 
+                        :style="{ background: proxy.ssl_enabled ? '#34d399' : '#94a3b8' }"
+                      ></span>
+                      {{ proxy.ssl_enabled ? 'HTTPS' : 'HTTP' }}
+                    </button>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      v-if="proxy.waf_mode === 'on'"
+                      class="badge"
+                      style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); cursor: pointer; transition: transform 0.15s;"
+                      title="Status: Aktif Enforce (Blokir). Klik untuk ubah ke Off"
+                      @click="handleCycleWaf(proxy)"
+                    >
+                      🛡️ Enforce
+                    </button>
+                    <button
+                      type="button"
+                      v-else-if="proxy.waf_mode === 'detection'"
+                      class="badge"
+                      style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); cursor: pointer; transition: transform 0.15s;"
+                      title="Status: Detection Only (Log saja). Klik untuk ubah ke Enforce (Blokir)"
+                      @click="handleCycleWaf(proxy)"
+                    >
+                      ⚠️ Detection
+                    </button>
+                    <button
+                      type="button"
+                      v-else
+                      class="badge"
+                      style="background: rgba(148, 163, 184, 0.1); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.2); cursor: pointer; transition: transform 0.15s;"
+                      title="Status: WAF Off. Klik untuk aktifkan ke Detection Only"
+                      @click="handleCycleWaf(proxy)"
+                    >
+                      Off
+                    </button>
                   </td>
                   <td>
                     <span :class="['status-badge', proxy.status]">
@@ -271,6 +333,7 @@ import api from '../services/api.js'
 import ProxyForm from '../components/ProxyForm.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import SslCertificates from './SslCertificates.vue'
+import WafMonitoring from './WafMonitoring.vue'
 import AccessLogs from './AccessLogs.vue'
 import Settings from './Settings.vue'
 
@@ -335,6 +398,28 @@ async function handleToggle(proxy) {
     fetchData()
   } catch (err) {
     window.__toast?.('Gagal mengubah status', 'error')
+  }
+}
+
+async function handleToggleSsl(proxy) {
+  try {
+    const res = await api.toggleSsl(proxy.id)
+    window.__toast?.(res.data.message, 'success')
+    fetchData()
+  } catch (err) {
+    window.__toast?.(err.response?.data?.message || 'Gagal mengubah status SSL', 'error')
+  }
+}
+
+async function handleCycleWaf(proxy) {
+  // Siklus pergantian mode: off -> detection -> on -> off
+  const nextMode = proxy.waf_mode === 'off' ? 'detection' : (proxy.waf_mode === 'detection' ? 'on' : 'off')
+  try {
+    const res = await api.setWafMode(proxy.id, nextMode)
+    window.__toast?.(res.data.message, 'success')
+    fetchData()
+  } catch (err) {
+    window.__toast?.(err.response?.data?.message || 'Gagal mengubah mode WAF', 'error')
   }
 }
 
