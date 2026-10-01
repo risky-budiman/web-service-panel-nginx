@@ -10,14 +10,28 @@ function getSslCertificates(req, res) {
     const proxies = ProxyModel.getAll();
 
     const certificates = proxies.map(p => {
+      const certInfo = systemExec.getCertificateInfo(p.domain_name);
+      const isEnabled = Boolean(p.ssl_enabled);
+      const hasCertOnDisk = certInfo.exists;
+
+      let status = 'Not Configured';
+      if (isEnabled && hasCertOnDisk) {
+        status = 'Active';
+      } else if (isEnabled && !hasCertOnDisk) {
+        status = 'Missing Cert';
+      } else if (!isEnabled && hasCertOnDisk) {
+        status = 'Disabled (Cert Ready)';
+      }
+
       return {
         id: p.id,
         domain_name: p.domain_name,
-        ssl_enabled: Boolean(p.ssl_enabled),
-        issuer: p.ssl_enabled ? "Let's Encrypt / Self-Signed" : 'None',
-        status: p.ssl_enabled ? 'Active' : 'Not Configured',
-        auto_renew: Boolean(p.ssl_enabled),
-        expires_at: p.ssl_enabled ? new Date(Date.now() + 85 * 24 * 60 * 60 * 1000).toISOString() : null
+        ssl_enabled: isEnabled,
+        has_cert: hasCertOnDisk,
+        issuer: hasCertOnDisk ? "Let's Encrypt" : (isEnabled ? 'Self-Signed' : 'None'),
+        status,
+        auto_renew: isEnabled,
+        expires_at: hasCertOnDisk ? new Date(Date.now() + 85 * 24 * 60 * 60 * 1000).toISOString() : null
       };
     });
 

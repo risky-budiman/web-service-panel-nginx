@@ -126,8 +126,8 @@ server {
     server_name ${serverNames};
 ${modSecBlock}
     # SSL Certificate
-    ssl_certificate /etc/letsencrypt/live/${proxy.domain_name}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${proxy.domain_name}/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/${proxy.cert_domain || proxy.domain_name}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${proxy.cert_domain || proxy.domain_name}/privkey.pem;
 
     # SSL Settings
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -197,11 +197,25 @@ function generateConfig(proxy) {
 
   // Jika di Linux, pastikan sertifikat Let's Encrypt benar-benar ada di disk
   if (useSsl && process.platform === 'linux') {
-    const certPath = `/etc/letsencrypt/live/${proxy.domain_name}/fullchain.pem`;
-    const keyPath = `/etc/letsencrypt/live/${proxy.domain_name}/privkey.pem`;
-    if (!fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
+    const clean = (proxy.domain_name || '').trim().toLowerCase();
+    const apex = clean.startsWith('www.') ? clean.substring(4) : clean;
+    const candidates = [clean, apex, `www.${apex}`];
+    let foundLive = null;
+
+    for (const name of candidates) {
+      const certPath = `/etc/letsencrypt/live/${name}/fullchain.pem`;
+      const keyPath = `/etc/letsencrypt/live/${name}/privkey.pem`;
+      if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+        foundLive = name;
+        break;
+      }
+    }
+
+    if (!foundLive) {
       console.warn(`⚠️  File sertifikat SSL belum ditemukan untuk ${proxy.domain_name}. Tetap gunakan konfigurasi HTTP.`);
       useSsl = false;
+    } else {
+      proxy.cert_domain = foundLive;
     }
   }
 

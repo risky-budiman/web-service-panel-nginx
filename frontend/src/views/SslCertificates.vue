@@ -57,16 +57,41 @@
               </span>
             </td>
             <td>
-              <span class="badge" :class="cert.ssl_enabled ? 'badge-active' : 'badge-inactive'">
-                <span class="badge-dot" :class="cert.ssl_enabled ? 'badge-dot-active' : ''"></span>
-                {{ cert.ssl_enabled ? 'HTTPS Aktif' : 'HTTP Saja' }}
+              <span 
+                v-if="cert.ssl_enabled && cert.has_cert" 
+                class="badge badge-active"
+              >
+                <span class="badge-dot badge-dot-active"></span>
+                HTTPS Aktif
+              </span>
+              <span 
+                v-else-if="cert.ssl_enabled && !cert.has_cert" 
+                class="badge" 
+                style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3);"
+                title="SSL aktif di panel namun file sertifikat belum ditemukan di VPS"
+              >
+                ⚠️ Missing Cert
+              </span>
+              <span 
+                v-else-if="!cert.ssl_enabled && cert.has_cert" 
+                class="badge" 
+                style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);"
+                title="Sertifikat sudah tersedia di disk, siap diaktifkan"
+              >
+                Siap (Cert Ready)
+              </span>
+              <span 
+                v-else 
+                class="badge badge-inactive"
+              >
+                HTTP Saja
               </span>
             </td>
             <td style="color: var(--text-secondary); font-size: 13px;">
               {{ cert.expires_at ? formatDate(cert.expires_at) : '-' }}
             </td>
             <td>
-              <span v-if="cert.ssl_enabled" style="color: var(--accent-success); font-size: 13px; font-weight: 500;">
+              <span v-if="cert.ssl_enabled && cert.has_cert" style="color: var(--accent-success); font-size: 13px; font-weight: 500;">
                 ✓ Aktif
               </span>
               <span v-else style="color: var(--text-muted); font-size: 13px;">
@@ -85,13 +110,12 @@
                   <span class="toggle-slider"></span>
                 </label>
                 <button
-                  v-if="cert.ssl_enabled"
                   class="btn btn-secondary btn-sm"
                   :disabled="actionLoading === cert.id"
                   @click="enableSsl(cert)"
-                  title="Perbarui sertifikat Let's Encrypt"
+                  :title="cert.ssl_enabled ? 'Terbitkan ulang / Perbarui sertifikat Let\'s Encrypt' : 'Terbitkan sertifikat baru'"
                 >
-                  {{ actionLoading === cert.id ? 'Memproses...' : '🔄 Renew' }}
+                  {{ actionLoading === cert.id ? 'Memproses...' : (cert.ssl_enabled ? '🔄 Renew' : '⚡ Request SSL') }}
                 </button>
               </div>
             </td>
