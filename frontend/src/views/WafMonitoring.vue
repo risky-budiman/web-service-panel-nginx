@@ -1,37 +1,37 @@
 <template>
-  <div class="page-content">
+  <div class="page-content waf-monitoring-view">
     <!-- Header Section -->
-    <div class="section-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+    <div class="section-header waf-header-row">
       <div>
-        <h2 style="font-size: 22px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+        <h2 class="waf-title">
           <span>🛡️</span> Web Application Firewall (WAF)
         </h2>
-        <p class="section-desc" style="color: var(--text-secondary); font-size: 14px;">
+        <p class="section-desc">
           Monitoring real-time deteksi ancaman, audit log OWASP Core Rule Set (CRS), dan status proteksi ModSecurity
         </p>
       </div>
       
       <!-- Top Action Toolbar -->
-      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+      <div class="waf-top-actions">
         <button 
           :class="['btn btn-sm', autoRefresh ? 'btn-primary' : 'btn-secondary']"
           @click="toggleAutoRefresh"
-          style="display: flex; align-items: center; gap: 6px;"
+          title="Polling otomatis setiap 5 detik"
         >
           <span :style="{ display: 'inline-block', transform: autoRefresh ? 'rotate(180deg)' : 'none', transition: 'transform 0.4s' }">⚡</span>
-          {{ autoRefresh ? 'Live Polling (5s)' : 'Auto Refresh Off' }}
+          <span>{{ autoRefresh ? 'Live (5s)' : 'Auto Refresh Off' }}</span>
         </button>
 
-        <button class="btn btn-secondary btn-sm" @click="fetchData(false)" :disabled="loading" style="display: flex; align-items: center; gap: 6px;">
-          <span>🔄</span> {{ loading ? 'Memuat...' : 'Refresh' }}
+        <button class="btn btn-secondary btn-sm" @click="fetchData(false)" :disabled="loading">
+          <span>🔄</span> <span>{{ loading ? 'Memuat...' : 'Refresh' }}</span>
         </button>
       </div>
     </div>
 
     <!-- Alert Status Log Server (Jika belum di Linux / log kosong) -->
-    <div v-if="!logData.available" class="card" style="margin-bottom: 20px; border-left: 4px solid var(--accent-warning); background: rgba(245, 158, 11, 0.05); padding: 16px 20px;">
-      <div style="display: flex; gap: 14px; align-items: flex-start;">
-        <div style="font-size: 22px; line-height: 1;">💡</div>
+    <div v-if="!logData.available" class="card waf-alert-card">
+      <div class="waf-alert-content">
+        <div style="font-size: 24px; line-height: 1;">💡</div>
         <div>
           <h4 style="font-size: 14px; font-weight: 600; color: var(--accent-warning); margin-bottom: 4px;">
             Status Server ModSecurity
@@ -45,7 +45,7 @@
     </div>
 
     <!-- Stats Grid Cards -->
-    <div class="stats-grid" style="margin-bottom: 24px;">
+    <div class="stats-grid waf-stats-grid" style="margin-bottom: 24px;">
       <div class="stat-card">
         <div class="stat-icon" style="background: rgba(239, 68, 68, 0.15); color: #ef4444;">🚨</div>
         <div class="stat-info">
@@ -82,24 +82,24 @@
     </div>
 
     <!-- Top Attackers & Frequent Rules Section -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 24px;">
+    <div class="waf-summary-grid">
       <!-- Top Attacker IPs -->
-      <div class="card" style="padding: 20px;">
-        <h3 style="font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between;">
+      <div class="card waf-card">
+        <h3 class="waf-card-title">
           <span style="display: flex; align-items: center; gap: 8px;"><span>🎯</span> Top 5 IP Penyerang</span>
-          <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;">Frekuensi Serangan</span>
+          <span class="waf-card-sub">Hits</span>
         </h3>
-        <div v-if="!stats.top_ips || stats.top_ips.length === 0" class="empty-state" style="padding: 20px 0;">
+        <div v-if="!stats.top_ips || stats.top_ips.length === 0" class="empty-state" style="padding: 24px 0;">
           <p style="font-size: 13px; color: var(--text-muted);">Belum ada IP ancaman tercatat</p>
         </div>
-        <div v-else style="display: flex; flex-direction: column; gap: 8px;">
+        <div v-else class="waf-list">
           <div 
             v-for="item in stats.top_ips" 
             :key="item.key" 
-            style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: rgba(21, 27, 43, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-sm);"
+            class="waf-list-item"
           >
-            <span style="font-family: monospace; font-size: 13px; color: #38bdf8; font-weight: 600;">{{ item.key }}</span>
-            <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3);">
+            <span class="waf-ip-code">{{ item.key }}</span>
+            <span class="badge" style="background: rgba(239, 68, 68, 0.18); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3);">
               {{ item.count }} hits
             </span>
           </div>
@@ -107,24 +107,24 @@
       </div>
 
       <!-- Top Triggered Rules -->
-      <div class="card" style="padding: 20px;">
-        <h3 style="font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between;">
+      <div class="card waf-card">
+        <h3 class="waf-card-title">
           <span style="display: flex; align-items: center; gap: 8px;"><span>📋</span> Kategori Ancaman Teratas</span>
-          <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;">Aturan Terpicu</span>
+          <span class="waf-card-sub">Aturan</span>
         </h3>
-        <div v-if="!stats.top_rules || stats.top_rules.length === 0" class="empty-state" style="padding: 20px 0;">
+        <div v-if="!stats.top_rules || stats.top_rules.length === 0" class="empty-state" style="padding: 24px 0;">
           <p style="font-size: 13px; color: var(--text-muted);">Belum ada rule yang ter-trigger</p>
         </div>
-        <div v-else style="display: flex; flex-direction: column; gap: 8px;">
+        <div v-else class="waf-list">
           <div 
             v-for="item in stats.top_rules" 
             :key="item.key" 
-            style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: rgba(21, 27, 43, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 13px;"
+            class="waf-list-item"
           >
-            <span style="color: var(--text-primary); max-width: 72%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" :title="item.key">
+            <span class="waf-rule-name" :title="item.key">
               {{ item.key }}
             </span>
-            <span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3);">
+            <span class="badge" style="background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); flex-shrink: 0;">
               {{ item.count }}x
             </span>
           </div>
@@ -133,10 +133,10 @@
     </div>
 
     <!-- Filter & Action Toolbar -->
-    <div class="card access-logs-toolbar" style="margin-bottom: 20px; padding: 16px 20px;">
-      <div class="logs-toolbar-row" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+    <div class="card access-logs-toolbar waf-toolbar" style="margin-bottom: 20px;">
+      <div class="logs-toolbar-row waf-toolbar-row">
         <!-- Search Field -->
-        <div class="logs-search-wrapper" style="flex: 1; min-width: 250px;">
+        <div class="logs-search-wrapper" style="flex: 1; min-width: 220px;">
           <div class="input-icon-wrapper">
             <span class="input-icon">🔍</span>
             <input
@@ -151,8 +151,8 @@
         </div>
 
         <!-- Filter Action -->
-        <div class="logs-actions-group" style="display: flex; align-items: center; gap: 12px;">
-          <span class="logs-count-badge" style="font-size: 13px; color: var(--text-secondary);">
+        <div class="waf-toolbar-actions">
+          <span class="logs-count-badge">
             Menampilkan: <strong>{{ logData.logs?.length || 0 }}</strong> event
           </span>
           <button class="btn btn-primary btn-sm" @click="fetchLogs(false)">
@@ -162,7 +162,7 @@
       </div>
     </div>
 
-    <!-- Table Audit Log Events -->
+    <!-- Table Audit Log Events (Fully Responsive with horizontal scroll) -->
     <div class="table-container">
       <div v-if="loading" class="empty-state" style="padding: 40px;">
         <div class="spinner" style="margin: 0 auto 16px; width: 32px; height: 32px;"></div>
@@ -172,19 +172,19 @@
       <div v-else-if="!logData.logs || logData.logs.length === 0" class="empty-state" style="padding: 40px;">
         <div class="empty-state-icon">🛡️</div>
         <h3>Tidak Ada Event Serangan Ditemukan</h3>
-        <p>Server dalam kondisi aman atau belum ada request mencurigakan yang tercatat.</p>
+        <p>Server dalam kondisi aman atau belum ada request mencurigakan yang cocok.</p>
       </div>
 
       <div v-else class="table-wrapper">
-        <table class="data-table">
+        <table class="data-table waf-table">
           <thead>
             <tr>
-              <th style="width: 150px;">Waktu</th>
-              <th style="width: 140px;">IP Penyerang</th>
-              <th style="width: 160px;">Target Host</th>
-              <th style="width: 220px;">Endpoint / Method</th>
-              <th>Rule Serangan Terdeteksi</th>
-              <th style="width: 130px; text-align: center;">Tindakan</th>
+              <th style="min-width: 140px;">Waktu</th>
+              <th style="min-width: 130px;">IP Penyerang</th>
+              <th style="min-width: 140px;">Target Host</th>
+              <th style="min-width: 200px;">Endpoint / Method</th>
+              <th style="min-width: 260px;">Rule Serangan Terdeteksi</th>
+              <th style="min-width: 110px; text-align: center;">Tindakan</th>
             </tr>
           </thead>
           <tbody>
@@ -193,12 +193,12 @@
                 {{ log.timestamp || '-' }}
               </td>
               <td>
-                <span style="font-family: monospace; font-size: 13px; font-weight: 600; color: #38bdf8;">
+                <span class="waf-ip-code">
                   {{ log.client_ip || '-' }}
                 </span>
               </td>
               <td>
-                <span style="font-weight: 500; color: var(--text-primary);">
+                <span style="font-weight: 500; color: var(--text-primary); font-size: 13px;">
                   {{ log.domain || '-' }}
                 </span>
               </td>
@@ -216,7 +216,7 @@
                 </div>
                 <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
                   Rule ID: <span style="font-family: monospace; color: var(--text-secondary);">{{ log.rule_id || '-' }}</span> 
-                  &nbsp;|&nbsp; Severity: <span style="font-weight: 600;">{{ log.severity }}</span>
+                  &nbsp;|&nbsp; Sev: <span style="font-weight: 600;">{{ log.severity }}</span>
                 </div>
               </td>
               <td style="text-align: center;">
@@ -317,3 +317,232 @@ onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer)
 })
 </script>
+
+<style scoped>
+.waf-monitoring-view {
+  width: 100%;
+  max-width: 100%;
+}
+
+.waf-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.waf-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.waf-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.waf-alert-card {
+  margin-bottom: 20px;
+  padding: 16px 20px;
+  border-left: 4px solid var(--accent-warning);
+  background: rgba(245, 158, 11, 0.05);
+}
+
+.waf-alert-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.waf-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.waf-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.waf-card {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.waf-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.waf-card-sub {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.waf-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.waf-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  gap: 10px;
+}
+
+.waf-ip-code {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  color: var(--accent-primary-hover);
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.waf-rule-name {
+  font-size: 13px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.waf-toolbar {
+  padding: 16px 20px;
+}
+
+.waf-toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.waf-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.waf-table {
+  width: 100%;
+  min-width: 750px;
+}
+
+/* ─── Responsive Breakpoints ────────────────────────────── */
+@media (max-width: 1024px) {
+  .waf-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .waf-header-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .waf-title {
+    font-size: 18px;
+  }
+
+  .waf-top-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .waf-top-actions .btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .waf-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .waf-summary-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  .waf-toolbar {
+    padding: 12px 14px;
+  }
+
+  .waf-toolbar-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .waf-toolbar-actions {
+    justify-content: space-between;
+    width: 100%;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .waf-toolbar-actions .btn {
+    flex: 1;
+    justify-content: center;
+    max-width: 120px;
+  }
+}
+
+@media (max-width: 480px) {
+  .waf-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .waf-card {
+    padding: 14px 12px;
+  }
+
+  .waf-list-item {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .waf-alert-card {
+    padding: 12px 14px;
+  }
+
+  .waf-top-actions {
+    flex-direction: row;
+    gap: 8px;
+  }
+}
+</style>
