@@ -8,13 +8,17 @@ set -e
 echo "🚀 Memulai Deployment Nginx Proxy Control Panel..."
 
 # 1. Update package dan install dependensi sistem
-echo "📦 Menginstall Node.js, Nginx, Git, dan Certbot..."
+echo "📦 Menginstall Node.js, Nginx, ModSecurity, dan Certbot..."
 sudo apt-get update
-sudo apt-get install -y curl nginx certbot python3-certbot-nginx git
+sudo apt-get install -y curl nginx certbot python3-certbot-nginx git software-properties-common
 
-# Install libmodsecurity jika package tersedia di repo Ubuntu
-echo "🛡️ Memeriksa ketersediaan paket ModSecurity Nginx..."
-sudo apt-get install -y libnginx-mod-http-modsecurity 2>/dev/null || sudo apt-get install -y libmodsecurity3 2>/dev/null || echo "ℹ️ ModSecurity package bawaan repo dilewati, melanjutkan deployment..."
+# Pastikan modul konektor Nginx ModSecurity terpasang
+if [ ! -f /etc/nginx/modules-enabled/50-mod-http-modsecurity.conf ] && ! nginx -V 2>&1 | grep -q "http_modsecurity"; then
+    echo "🛡️ Menyiapkan ModSecurity Connector untuk Nginx..."
+    sudo add-apt-repository -y ppa:ondrej/nginx || true
+    sudo apt-get update || true
+    sudo apt-get install -y libnginx-mod-http-modsecurity || true
+fi
 
 # Install Node.js LTS (jika belum ada)
 if ! command -v node &> /dev/null; then
@@ -43,9 +47,13 @@ sudo mkdir -p $MODSEC_DIR
 if [ ! -f "$MODSEC_DIR/modsecurity.conf" ]; then
     echo "📥 Mengunduh konfigurasi dasar ModSecurity..."
     sudo curl -fsSL -o "$MODSEC_DIR/modsecurity.conf" https://raw.githubusercontent.com/owasp-modsecurity/ModSecurity/v3/master/modsecurity.conf-recommended || true
-    if [ -f "$MODSEC_DIR/modsecurity.conf" ]; then
-        sudo sed -i 's/SecRuleEngine DetectionOnly/SecRuleEngine On/g' "$MODSEC_DIR/modsecurity.conf"
-    fi
+fi
+
+# Pastikan audit log dan rule engine aktif di modsecurity.conf
+if [ -f "$MODSEC_DIR/modsecurity.conf" ]; then
+    sudo sed -i 's/SecRuleEngine DetectionOnly/SecRuleEngine On/g' "$MODSEC_DIR/modsecurity.conf" 2>/dev/null || true
+    sudo sed -i 's/SecAuditEngine RelevantOnly/SecAuditEngine On/g' "$MODSEC_DIR/modsecurity.conf" 2>/dev/null || true
+    sudo sed -i 's|SecAuditLog /var/log/.*|SecAuditLog /var/log/modsec_audit.log|g' "$MODSEC_DIR/modsecurity.conf" 2>/dev/null || true
 fi
 
 # Setup OWASP CRS jika belum ada
