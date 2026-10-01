@@ -8,9 +8,13 @@ set -e
 echo "🚀 Memulai Deployment Nginx Proxy Control Panel..."
 
 # 1. Update package dan install dependensi sistem
-echo "📦 Menginstall Node.js, Nginx, ModSecurity, dan Certbot..."
+echo "📦 Menginstall Node.js, Nginx, Git, dan Certbot..."
 sudo apt-get update
-sudo apt-get install -y curl nginx certbot python3-certbot-nginx git libnginx-mod-http-modsecurity
+sudo apt-get install -y curl nginx certbot python3-certbot-nginx git
+
+# Install libmodsecurity jika package tersedia di repo Ubuntu
+echo "🛡️ Memeriksa ketersediaan paket ModSecurity Nginx..."
+sudo apt-get install -y libnginx-mod-http-modsecurity 2>/dev/null || sudo apt-get install -y libmodsecurity3 2>/dev/null || echo "ℹ️ ModSecurity package bawaan repo dilewati, melanjutkan deployment..."
 
 # Install Node.js LTS (jika belum ada)
 if ! command -v node &> /dev/null; then
