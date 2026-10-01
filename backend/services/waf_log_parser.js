@@ -138,8 +138,8 @@ class WafLogParser {
     let currentSection = null;
 
     for await (const line of rl) {
-      // Header boundary contoh: --a1b2c3d4-A--
-      const boundaryMatch = line.match(/^--([a-zA-Z0-9]+)-([A-Z])--$/);
+      // Header boundary ModSecurity v3: ---OgnNPp1m---A-- atau --OgnNPp1m-A--
+      const boundaryMatch = line.match(/^-+([a-zA-Z0-9]+)-+([A-Z])--$/);
       if (boundaryMatch) {
         const entryId = boundaryMatch[1];
         const section = boundaryMatch[2];
@@ -158,7 +158,7 @@ class WafLogParser {
             http_version: '',
             domain: '',
             user_agent: '',
-            status_code: 0,
+            status_code: 403,
             rule_id: '',
             rule_message: '',
             rule_data: '',
@@ -195,32 +195,32 @@ class WafLogParser {
       }
       // Section B: Request headers
       else if (currentSection === 'B') {
-        const reqLineMatch = line.match(/^([A-Z]+)\s+(\S+)\s+(HTTP\/\d\.\d)/);
+        const reqLineMatch = line.match(/^([A-Z]+)\s+(\S+)\s+(HTTP\/[\d\.]+)/i);
         if (reqLineMatch) {
           currentEntry.method = reqLineMatch[1];
           currentEntry.uri = reqLineMatch[2];
           currentEntry.http_version = reqLineMatch[3];
         }
-        const hostMatch = line.match(/^Host:\s*(\S+)/i);
+        const hostMatch = line.match(/^host:\s*(\S+)/i);
         if (hostMatch) {
           currentEntry.domain = hostMatch[1].split(':')[0];
         }
-        const uaMatch = line.match(/^User-Agent:\s*(.*)/i);
+        const uaMatch = line.match(/^user-agent:\s*(.*)/i);
         if (uaMatch) {
           currentEntry.user_agent = uaMatch[1];
         }
       }
       // Section F: Response headers
       else if (currentSection === 'F') {
-        const statusMatch = line.match(/^HTTP\/\d\.\d\s+(\d+)/);
+        const statusMatch = line.match(/^HTTP\/[\d\.]+\s+(\d+)/i);
         if (statusMatch) {
           currentEntry.status_code = parseInt(statusMatch[1], 10);
         }
       }
-      // Section H: Audit log messages (ModSecurity attack rule matches)
-      else if (currentSection === 'H') {
-        if (line.includes('Message:')) {
-          const msgMatch = line.match(/Message:\s*(.*?)(?=\s*\[file|\s*$)/);
+      // Section H atau Section K: Audit log messages (ModSecurity attack rule matches)
+      else if (currentSection === 'H' || currentSection === 'K') {
+        if (line.includes('Message:') || line.includes('msg "')) {
+          const msgMatch = line.match(/Message:\s*(.*?)(?=\s*\[file|\s*$)/) || line.match(/\[msg\s+"(.*?)"\]/);
           if (msgMatch && !currentEntry.rule_message) {
             currentEntry.rule_message = msgMatch[1];
           }
