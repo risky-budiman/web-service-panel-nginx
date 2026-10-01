@@ -39,7 +39,7 @@ export default {
   createProxy: (data) => api.post('/proxies', data),
   updateProxy: (id, data) => api.put(`/proxies/${id}`, data),
   deleteProxy: (id) => api.delete(`/proxies/${id}`),
-  toggleProxy: (id) => api.patch(`/proxies/${id}/toggle`),
+  toggleProxy: (id) => api.post(`/proxies/${id}/toggle`),
 
   // Stats
   getStats: () => api.get('/stats'),
@@ -47,7 +47,7 @@ export default {
   // SSL
   getSslCertificates: () => api.get('/ssl'),
   requestSsl: (proxy_id) => api.post('/ssl/request', { proxy_id }),
-  toggleSsl: (id) => api.patch(`/ssl/${id}/toggle`),
+  toggleSsl: (id) => api.post(`/ssl/${id}/toggle`),
 
   // Logs
   getLogs: (domain, limit) => api.get('/logs', { params: { domain, limit } }),
@@ -56,7 +56,7 @@ export default {
   // ModSecurity WAF
   getWafLogs: (params) => api.get('/waf/logs', { params }),
   getWafStats: () => api.get('/waf/stats'),
-  setWafMode: (id, waf_mode) => api.patch(`/waf/${id}/mode`, { waf_mode }),
+  setWafMode: (id, waf_mode) => api.post(`/waf/${id}/mode`, { waf_mode }),
 
   // Settings
   getSystemInfo: () => api.get('/settings/system'),
