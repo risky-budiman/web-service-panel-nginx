@@ -45,8 +45,9 @@ sudo mkdir -p $MODSEC_DIR
 
 # Download default modsecurity.conf jika belum ada
 if [ ! -f "$MODSEC_DIR/modsecurity.conf" ]; then
-    echo "📥 Mengunduh konfigurasi dasar ModSecurity..."
-    sudo curl -fsSL -o "$MODSEC_DIR/modsecurity.conf" https://raw.githubusercontent.com/owasp-modsecurity/ModSecurity/v3/master/modsecurity.conf-recommended || true
+    echo "📥 Mengunduh konfigurasi dasar ModSecurity v3.0.4..."
+    sudo curl -fsSL -o "$MODSEC_DIR/modsecurity.conf" https://raw.githubusercontent.com/owasp-modsecurity/ModSecurity/v3.0.4/modsecurity.conf-recommended || true
+    sudo curl -fsSL -o "$MODSEC_DIR/unicode.mapping" https://raw.githubusercontent.com/owasp-modsecurity/ModSecurity/v3.0.4/unicode.mapping || true
 fi
 
 # Pastikan audit log dan rule engine aktif di modsecurity.conf
@@ -58,10 +59,14 @@ fi
 
 # Setup OWASP CRS jika belum ada
 if [ ! -d "$MODSEC_DIR/owasp-crs" ]; then
-    echo "📥 Mengkloning OWASP Core Rule Set (CRS)..."
-    sudo git clone --depth 1 https://github.com/coreruleset/coreruleset.git "$MODSEC_DIR/owasp-crs" || true
+    echo "📥 Mengkloning OWASP Core Rule Set (CRS v3.3.5 LTS)..."
+    sudo git clone --depth 1 -b v3.3.5 https://github.com/coreruleset/coreruleset.git "$MODSEC_DIR/owasp-crs" || true
     if [ -f "$MODSEC_DIR/owasp-crs/crs-setup.conf.example" ]; then
         sudo cp "$MODSEC_DIR/owasp-crs/crs-setup.conf.example" "$MODSEC_DIR/owasp-crs/crs-setup.conf"
+    fi
+    # Disable rule 922 yang membutuhkan modul v3.0.8+
+    if [ -f "$MODSEC_DIR/owasp-crs/rules/REQUEST-922-MULTIPART-ATTACK.conf" ]; then
+        sudo mv "$MODSEC_DIR/owasp-crs/rules/REQUEST-922-MULTIPART-ATTACK.conf" "$MODSEC_DIR/owasp-crs/rules/REQUEST-922-MULTIPART-ATTACK.conf.bak" || true
     fi
 fi
 
