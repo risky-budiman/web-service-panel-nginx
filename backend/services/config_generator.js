@@ -109,17 +109,29 @@ ${modSecBlock}
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # Local Proxy Cache di Server Panel (hanya 1x ambil dari backend, selanjutnya 0ms)
+        # Abaikan header anti-cache dari backend (n8n/Node.js mengirim Set-Cookie/no-cache yang membatalkan cache)
+        proxy_ignore_headers Cache-Control Expires Set-Cookie;
+        proxy_hide_header Set-Cookie;
+        proxy_hide_header Cache-Control;
+
+        # Local Proxy Cache di Server Panel (hanya 1x ambil dari backend on-premise, selanjutnya 0ms)
         proxy_cache PANEL_CACHE;
-        proxy_cache_valid 200 304 7d;
+        proxy_cache_valid 200 304 30d;
         proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
         proxy_cache_lock on;
+        proxy_cache_lock_timeout 5s;
+        proxy_cache_revalidate on;
 
-        # Browser Cache
-        expires 7d;
-        add_header Cache-Control "public, no-transform";
+        # Browser Cache 30 hari (Instan dari disk cache laptop)
+        expires 30d;
+        add_header Cache-Control "public, max-age=2592000, immutable" always;
         add_header X-Cache-Status $upstream_cache_status always;
         access_log off;
+
+        # Gzip kompresi paksa untuk file statis
+        gzip on;
+        gzip_proxied any;
+        gzip_types *;
     }
 
     location / {
@@ -209,17 +221,29 @@ ${modSecBlock}
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto https;
 
-        # Local Proxy Cache di Server Panel (hanya 1x ambil dari backend, selanjutnya 0ms)
+        # Abaikan header anti-cache dari backend (n8n/Node.js mengirim Set-Cookie/no-cache yang membatalkan cache)
+        proxy_ignore_headers Cache-Control Expires Set-Cookie;
+        proxy_hide_header Set-Cookie;
+        proxy_hide_header Cache-Control;
+
+        # Local Proxy Cache di Server Panel (hanya 1x ambil dari backend on-premise, selanjutnya 0ms)
         proxy_cache PANEL_CACHE;
-        proxy_cache_valid 200 304 7d;
+        proxy_cache_valid 200 304 30d;
         proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
         proxy_cache_lock on;
+        proxy_cache_lock_timeout 5s;
+        proxy_cache_revalidate on;
 
-        # Browser Cache
-        expires 7d;
-        add_header Cache-Control "public, no-transform";
+        # Browser Cache 30 hari (Instan dari disk cache laptop)
+        expires 30d;
+        add_header Cache-Control "public, max-age=2592000, immutable" always;
         add_header X-Cache-Status $upstream_cache_status always;
         access_log off;
+
+        # Gzip kompresi paksa untuk file statis
+        gzip on;
+        gzip_proxied any;
+        gzip_types *;
     }
 
     location / {
