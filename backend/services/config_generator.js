@@ -409,7 +409,7 @@ function generateOptimizationGlobals() {
 # agar Upstream Keepalive Connection Pooling bekerja maksimal.
 map $http_upgrade $connection_upgrade {
     default upgrade;
-    ''      '';
+    ''      close;
 }
 
 # 2. Gzip Compression Berkecepatan Tinggi
