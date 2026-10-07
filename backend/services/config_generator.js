@@ -127,11 +127,6 @@ ${modSecBlock}
         add_header Cache-Control "public, max-age=2592000, immutable" always;
         add_header X-Cache-Status $upstream_cache_status always;
         access_log off;
-
-        # Gzip kompresi paksa untuk file statis
-        gzip on;
-        gzip_proxied any;
-        gzip_types *;
     }
 
     location / {
@@ -239,11 +234,6 @@ ${modSecBlock}
         add_header Cache-Control "public, max-age=2592000, immutable" always;
         add_header X-Cache-Status $upstream_cache_status always;
         access_log off;
-
-        # Gzip kompresi paksa untuk file statis
-        gzip on;
-        gzip_proxied any;
-        gzip_types *;
     }
 
     location / {
@@ -458,8 +448,7 @@ map $http_upgrade $connection_upgrade {
     ''      close;
 }
 
-# 2. Gzip Compression Berkecepatan Tinggi
-gzip on;
+# 2. Gzip Compression Berkecepatan Tinggi (Mengaktifkan tuning kompresi untuk Nginx)
 gzip_vary on;
 gzip_proxied any;
 gzip_comp_level 5;
