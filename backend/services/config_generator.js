@@ -2,9 +2,9 @@ const fs = require('fs');
 const path = require('path');
 
 // Path untuk menyimpan konfigurasi Nginx yang di-generate
-// Pada server Linux: /etc/nginx/panel-conf.d/
+// Pada server Linux: default selalu /etc/nginx/panel-conf.d
 // Untuk development di Windows: ./nginx-configs/
-const NGINX_CONF_DIR = process.env.NGINX_CONF_DIR || path.join(__dirname, '..', 'nginx-configs');
+const NGINX_CONF_DIR = process.env.NGINX_CONF_DIR || (process.platform === 'linux' ? '/etc/nginx/panel-conf.d' : path.join(__dirname, '..', 'nginx-configs'));
 
 // Pastikan folder ada
 if (!fs.existsSync(NGINX_CONF_DIR)) {
