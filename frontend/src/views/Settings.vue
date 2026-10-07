@@ -40,6 +40,40 @@
         </div>
       </div>
 
+      <!-- Performance & Acceleration Card -->
+      <div class="card">
+        <h4 style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+          <span>🚀</span> Akselerasi & Optimasi Performa Nginx
+        </h4>
+        <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 14px;">
+          Optimasi tingkat tinggi untuk reverse proxy: Upstream keepalive connection pooling, kompresi Gzip otomatis, SSL session cache, dan akselerasi file statis.
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; margin-bottom: 16px; background: rgba(99, 102, 241, 0.05); padding: 12px; border-radius: 8px; border: 1px solid rgba(99, 102, 241, 0.15);">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span>⚡</span> <span><strong>Upstream Keepalive</strong>: 64 connection pool</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span>📦</span> <span><strong>Gzip Engine</strong>: Kompresi HTML, CSS, JS, JSON</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span>🖼️</span> <span><strong>Static Cache</strong>: Cache browser 7 hari</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span>🔒</span> <span><strong>SSL Cache</strong>: 10MB session resumption (1 hari)</span>
+          </div>
+        </div>
+        <button
+          class="btn btn-primary"
+          :disabled="optimizing"
+          @click="handleOptimizeAll"
+          style="width: 100%; justify-content: center;"
+        >
+          <span v-if="optimizing" class="spinner"></span>
+          <span v-else>⚡</span>
+          {{ optimizing ? 'Mengoptimasi...' : 'Terapkan Optimasi ke Semua Domain' }}
+        </button>
+      </div>
+
       <!-- Backup & Restore Database Card -->
       <div class="card">
         <h4 style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
@@ -141,6 +175,7 @@ const system = ref({})
 const loading = ref(true)
 const pwdLoading = ref(false)
 const restoring = ref(false)
+const optimizing = ref(false)
 const fileInput = ref(null)
 
 const pwdForm = reactive({
@@ -162,6 +197,19 @@ async function fetchSystemInfo() {
     window.__toast?.('Gagal memuat info sistem', 'error')
   } finally {
     loading.value = false
+  }
+}
+
+async function handleOptimizeAll() {
+  optimizing.value = true
+  try {
+    const res = await api.optimizeAll()
+    window.__toast?.(res.data?.message || 'Optimasi konfigurasi berhasil diterapkan!', 'success')
+    fetchSystemInfo()
+  } catch (err) {
+    window.__toast?.(err.response?.data?.message || 'Gagal menerapkan optimasi', 'error')
+  } finally {
+    optimizing.value = false
   }
 }
 

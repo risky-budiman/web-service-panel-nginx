@@ -64,5 +64,6 @@ export default {
   backupDbUrl: '/api/settings/backup-db',
   restoreDb: (fileBuffer) => api.post('/settings/restore-db', fileBuffer, {
     headers: { 'Content-Type': 'application/octet-stream' }
-  })
+  }),
+  optimizeAll: () => api.post('/settings/optimize-all')
 }

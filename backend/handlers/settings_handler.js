@@ -123,9 +123,28 @@ function restoreDatabase(req, res) {
   }
 }
 
+/**
+ * POST /api/settings/optimize-all — Regenerasi seluruh konfigurasi dengan optimasi performa tinggi
+ */
+async function optimizeAll(req, res) {
+  try {
+    const configGen = require('../services/config_generator');
+    const result = await configGen.regenerateAllConfigs();
+    res.json({
+      success: true,
+      message: `Semua konfigurasi proxy (${result.count} domain) berhasil diperbarui dengan akselerasi maksimal!`,
+      data: result
+    });
+  } catch (err) {
+    console.error('Error optimizeAll:', err);
+    res.status(500).json({ success: false, message: 'Gagal mengoptimasi konfigurasi: ' + err.message });
+  }
+}
+
 module.exports = {
   getSystemInfo,
   changePassword,
   backupDatabase,
-  restoreDatabase
+  restoreDatabase,
+  optimizeAll
 };

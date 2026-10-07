@@ -83,6 +83,7 @@ app.get('/api/settings/system', authMiddleware, settingsHandler.getSystemInfo);
 app.post('/api/settings/change-password', authMiddleware, settingsHandler.changePassword);
 app.get('/api/settings/backup-db', authMiddleware, settingsHandler.backupDatabase);
 app.post('/api/settings/restore-db', authMiddleware, express.raw({ type: '*/*', limit: '50mb' }), settingsHandler.restoreDatabase);
+app.post('/api/settings/optimize-all', authMiddleware, settingsHandler.optimizeAll);
 
 // ─── Health Check ───────────────────────────────────────────
 app.get('/api/health', (req, res) => {
@@ -123,9 +124,17 @@ async function startServer() {
     await initDb();
     console.log('✅ Database initialized');
 
-    // Otomatis pastikan blokir akses langsung IP publik aktif
+    // Otomatis pastikan optimasi global Nginx dan blokir IP aktif
     const configGen = require('./services/config_generator');
+    configGen.generateOptimizationGlobals();
     configGen.generateDefaultCatchAll();
+
+    // Otomatis regenerasi konfigurasi seluruh domain aktif dengan akselerasi terbaru
+    try {
+      await configGen.regenerateAllConfigs();
+    } catch (regenErr) {
+      console.warn('⚠️ Gagal regenerasi config saat start:', regenErr.message);
+    }
 
     // Start Express
     app.listen(PORT, () => {
