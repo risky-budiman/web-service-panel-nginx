@@ -281,7 +281,6 @@ ${modSecBlock}
         # Mixed-content rewrite ringan khusus HTML (tidak membebani JSON / API / JS)
         sub_filter 'http://${proxy.domain_name}' 'https://${proxy.domain_name}';
         sub_filter_once off;
-        sub_filter_types text/html;
 
         # Timeouts panjang untuk workflow n8n & execution streaming
         proxy_connect_timeout 60s;
@@ -497,19 +496,12 @@ gzip_types
     text/x-component
     text/x-cross-domain-policy;
 
-# 3. Kernel TCP Stack Optimization
-tcp_nopush on;
-tcp_nodelay on;
-reset_timedout_connection on;
-keepalive_timeout 65s;
-keepalive_requests 1000;
-
-# 4. Proxy Global Buffering Tuning
+# 3. Proxy Global Buffering Tuning
 proxy_buffer_size 128k;
 proxy_buffers 4 256k;
 proxy_busy_buffers_size 256k;
 
-# 5. Local SSD Proxy Cache (Mengeliminasi delay transfer antar-server)
+# 4. Local SSD Proxy Cache (Mengeliminasi delay transfer antar-server)
 proxy_cache_path /tmp/nginx_panel_cache levels=1:2 keys_zone=PANEL_CACHE:50m max_size=2g inactive=7d use_temp_path=off;
 `;
 
