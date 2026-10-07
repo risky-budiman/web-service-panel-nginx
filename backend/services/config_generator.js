@@ -128,16 +128,15 @@ ${modSecBlock}
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;
 
-        # Buffer Optimization untuk High Throughput
-        proxy_buffering on;
-        proxy_buffers 16 32k;
-        proxy_buffer_size 64k;
-        proxy_busy_buffers_size 128k;
+        # Disable buffering untuk SSE (Server-Sent Events), n8n canvas, AI streaming
+        proxy_buffering off;
+        proxy_cache off;
+        chunked_transfer_encoding off;
 
-        # Timeouts
+        # Timeouts panjang untuk workflow n8n & long polling
         proxy_connect_timeout 60s;
-        proxy_send_timeout 120s;
-        proxy_read_timeout 120s;
+        proxy_send_timeout 3600s;
+        proxy_read_timeout 3600s;
     }
 }
 `;
@@ -227,11 +226,10 @@ ${modSecBlock}
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;
 
-        # Buffer Optimization untuk Framework Modern (Bun, Node, Vite, React, Vue, Next.js)
-        proxy_buffering on;
-        proxy_buffers 16 32k;
-        proxy_buffer_size 64k;
-        proxy_busy_buffers_size 128k;
+        # Disable buffering untuk SSE (Server-Sent Events), n8n canvas, AI streaming
+        proxy_buffering off;
+        proxy_cache off;
+        chunked_transfer_encoding off;
 
         # Redirect rewrite agar tidak looping atau kembali ke http
         proxy_redirect http:// https://;
@@ -245,10 +243,10 @@ ${modSecBlock}
         sub_filter_once off;
         sub_filter_types text/html;
 
-        # Timeouts fleksibel
+        # Timeouts panjang untuk workflow n8n & execution streaming
         proxy_connect_timeout 60s;
-        proxy_send_timeout 120s;
-        proxy_read_timeout 120s;
+        proxy_send_timeout 3600s;
+        proxy_read_timeout 3600s;
     }
 }
 `;
