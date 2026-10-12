@@ -153,6 +153,35 @@ ${modSecBlock}
         proxy_send_timeout 3600s;
         proxy_read_timeout 3600s;
     }
+
+    # Khusus OAuth2 Callback & Webhooks (Bypass WAF false-positives & buffering)
+    location ~* ^/(rest/oauth2-credential/callback|webhook|webhook-test) {
+        proxy_pass http://${upstreamName};
+        proxy_http_version 1.1;
+
+        # Headers
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Disable Buffering & Cache
+        proxy_buffering off;
+        proxy_cache off;
+        chunked_transfer_encoding off;
+
+        # Buffer besar untuk token/header OAuth
+        proxy_buffer_size 128k;
+        proxy_buffers 4 256k;
+        proxy_busy_buffers_size 256k;
+
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+
+        # Bypass WAF ModSecurity jika aktif agar tidak memblokir kode token acak
+        ${proxy.waf_mode !== 'off' ? 'modsecurity off;' : ''}
+    }
 }
 `;
 }
@@ -276,6 +305,41 @@ ${modSecBlock}
         proxy_connect_timeout 60s;
         proxy_send_timeout 3600s;
         proxy_read_timeout 3600s;
+    }
+
+    # Khusus OAuth2 Callback & Webhooks (Bypass WAF false-positives & buffering)
+    location ~* ^/(rest/oauth2-credential/callback|webhook|webhook-test) {
+        proxy_pass http://${upstreamName};
+        proxy_http_version 1.1;
+
+        # Standard Proxy Headers
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Protocol https;
+        proxy_set_header X-Forwarded-Ssl on;
+        proxy_set_header X-Url-Scheme https;
+        proxy_set_header X-Forwarded-Port 443;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header HTTPS on;
+
+        # Disable Buffering & Cache
+        proxy_buffering off;
+        proxy_cache off;
+        chunked_transfer_encoding off;
+
+        # Buffer besar untuk token/header OAuth dari Google
+        proxy_buffer_size 128k;
+        proxy_buffers 4 256k;
+        proxy_busy_buffers_size 256k;
+
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+
+        # Bypass WAF ModSecurity jika aktif agar kode autentikasi Google tidak terblokir
+        ${proxy.waf_mode !== 'off' ? 'modsecurity off;' : ''}
     }
 }
 `;
