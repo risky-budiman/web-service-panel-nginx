@@ -56,7 +56,7 @@
             <span>📦</span> <span><strong>Gzip Engine</strong>: Kompresi HTML, CSS, JS, JSON</span>
           </div>
           <div style="display: flex; align-items: center; gap: 8px;">
-            <span>🖼️</span> <span><strong>Static Cache</strong>: Cache browser 7 hari</span>
+            <span>🖼️</span> <span><strong>Static Cache</strong>: Cache browser 30 hari</span>
           </div>
           <div style="display: flex; align-items: center; gap: 8px;">
             <span>🔒</span> <span><strong>SSL Cache</strong>: 10MB session resumption (1 hari)</span>
@@ -137,7 +137,8 @@
                 v-model="pwdForm.newPassword"
                 type="password"
                 class="form-input"
-                placeholder="Minimal 6 karakter"
+                placeholder="Minimal 10 karakter"
+                minlength="10"
                 required
               />
             </div>
@@ -213,10 +214,24 @@ async function handleOptimizeAll() {
   }
 }
 
-function downloadBackup() {
-  const token = localStorage.getItem('token')
-  const url = `${api.backupDbUrl}?token=${token}`
-  window.open(url, '_blank')
+async function downloadBackup() {
+  try {
+    const res = await api.downloadBackup()
+    const disposition = res.headers['content-disposition'] || ''
+    const match = /filename="?([^";]+)"?/.exec(disposition)
+    const filename = match ? match[1] : 'nginx-panel-backup.db'
+
+    const url = URL.createObjectURL(res.data)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    window.__toast?.('Gagal mengunduh backup database', 'error')
+  }
 }
 
 async function handleRestoreFile(event) {

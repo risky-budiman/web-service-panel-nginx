@@ -6,6 +6,24 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' }
 })
 
+// ─── Sesi (token & user di localStorage) ────────────────────
+export function getStoredUser() {
+  try {
+    return JSON.parse(localStorage.getItem('user') || 'null')
+  } catch (_) {
+    return null
+  }
+}
+
+export function setStoredUser(user) {
+  localStorage.setItem('user', JSON.stringify(user))
+}
+
+export function clearSession() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('user')
+}
+
 // Interceptor: tambah token ke setiap request
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('token')
@@ -15,14 +33,20 @@ api.interceptors.request.use(config => {
   return config
 })
 
-// Interceptor: handle 401 (token expired)
+// Interceptor: 401 → login ulang, 403 PASSWORD_CHANGE_REQUIRED → halaman ganti password
 api.interceptors.response.use(
   response => response,
   error => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      window.location.href = '/login'
+    const status = error.response?.status
+    const isLoginRequest = error.config?.url?.includes('/auth/login')
+
+    if (status === 401 && !isLoginRequest) {
+      clearSession()
+      if (window.location.pathname !== '/login') window.location.href = '/login'
+    } else if (status === 403 && error.response?.data?.code === 'PASSWORD_CHANGE_REQUIRED') {
+      const user = getStoredUser() || {}
+      setStoredUser({ ...user, must_change_password: true })
+      if (window.location.pathname !== '/change-password') window.location.href = '/change-password'
     }
     return Promise.reject(error)
   }
@@ -61,7 +85,8 @@ export default {
   // Settings
   getSystemInfo: () => api.get('/settings/system'),
   changePassword: (currentPassword, newPassword) => api.post('/settings/change-password', { currentPassword, newPassword }),
-  backupDbUrl: '/api/settings/backup-db',
+  // Backup diunduh sebagai blob lewat header Authorization (token tidak lagi di URL)
+  downloadBackup: () => api.get('/settings/backup-db', { responseType: 'blob', timeout: 120000 }),
   restoreDb: (fileBuffer) => api.post('/settings/restore-db', fileBuffer, {
     headers: { 'Content-Type': 'application/octet-stream' }
   }),

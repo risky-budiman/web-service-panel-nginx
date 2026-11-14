@@ -66,7 +66,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import api from '../services/api.js'
+import api, { setStoredUser } from '../services/api.js'
 
 const isDev = import.meta.env.DEV
 const router = useRouter()
@@ -81,9 +81,10 @@ async function handleLogin() {
 
   try {
     const res = await api.login(username.value, password.value)
-    localStorage.setItem('token', res.data.data.token)
-    localStorage.setItem('user', JSON.stringify(res.data.data.user))
-    router.push('/')
+    const { token, user } = res.data.data
+    localStorage.setItem('token', token)
+    setStoredUser(user)
+    router.push(user.must_change_password ? '/change-password' : '/')
   } catch (err) {
     error.value = err.response?.data?.message || 'Gagal terhubung ke server'
   } finally {
