@@ -5,6 +5,41 @@ const path = require('path');
 const AUDIT_LOG_PATH = process.env.MODSEC_AUDIT_LOG || '/var/log/modsec_audit.log';
 const WAF_TAIL_BYTES = (parseInt(process.env.WAF_TAIL_MB, 10) || 20) * 1024 * 1024;
 
+// Level syslog yang dipakai ModSecurity / OWASP CRS (angka kecil = lebih parah)
+const SEVERITY_NAMES = ['EMERGENCY', 'ALERT', 'CRITICAL', 'ERROR', 'WARNING', 'NOTICE', 'INFO', 'DEBUG'];
+const SEVERITY_RANK = Object.fromEntries(SEVERITY_NAMES.map((name, i) => [name, i]));
+
+// Rule evaluasi skor anomali CRS (949xxx inbound, 959xxx outbound, 980xxx korelasi)
+// hanya "akibat" dari rule lain, jadi bukan kandidat rule utama.
+function isScoringRule(id) {
+  return /^(949|959|980)\d{3}$/.test(id || '');
+}
+
+/**
+ * Tentukan rule utama sebuah entri: rule deteksi (bukan scoring) dengan severity
+ * paling parah. Severity entri = severity paling parah dari semua rule.
+ */
+function finalizeEntry(entry) {
+  const rules = entry.rules;
+  if (rules.length > 0) {
+    const bySeverity = (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity];
+    const detection = rules.filter(r => !isScoringRule(r.id));
+    const primary = [...(detection.length ? detection : rules)].sort(bySeverity)[0];
+    entry.rule_id = primary.id;
+    entry.rule_message = primary.message;
+    entry.rule_data = primary.data || (rules.find(r => r.data) || {}).data || '';
+    entry.severity = [...rules].sort(bySeverity)[0].severity;
+  }
+  entry.is_attack = Boolean(entry.rule_id || entry.rule_message);
+  return entry;
+}
+
+function normalizeSeverity(value) {
+  if (/^\d$/.test(value)) return SEVERITY_NAMES[Number(value)] || null;
+  const name = value.toUpperCase();
+  return name in SEVERITY_RANK ? name : null;
+}
+
 /**
  * Service untuk membaca dan mem-parse log ModSecurity
  * Mendukung format native ModSecurity v3 (Section A, B, F, H, Z)
@@ -56,8 +91,8 @@ class WafLogParser {
         filtered = filtered.filter(l => 
           (l.client_ip || '').includes(s) ||
           (l.uri || '').toLowerCase().includes(s) ||
-          (l.rule_message || '').toLowerCase().includes(s) ||
-          (l.rule_id || '').includes(s)
+          (l.domain || '').toLowerCase().includes(s) ||
+          (l.rules || []).some(r => r.id.includes(s) || r.message.toLowerCase().includes(s))
         );
       }
 
@@ -108,8 +143,12 @@ class WafLogParser {
           if (log.client_ip) {
             ipCounts[log.client_ip] = (ipCounts[log.client_ip] || 0) + 1;
           }
-          if (log.rule_message || log.rule_id) {
-            const ruleKey = log.rule_message ? `${log.rule_message} (${log.rule_id})` : `Rule ID ${log.rule_id}`;
+          // Hitung setiap rule deteksi yang terpicu (sekali per request), tanpa rule skor anomali
+          const seen = new Set();
+          for (const rule of log.rules || []) {
+            if (isScoringRule(rule.id) || seen.has(rule.id)) continue;
+            seen.add(rule.id);
+            const ruleKey = rule.message ? `${rule.message} (${rule.id})` : `Rule ID ${rule.id}`;
             ruleCounts[ruleKey] = (ruleCounts[ruleKey] || 0) + 1;
           }
           if (log.domain) {
@@ -193,6 +232,7 @@ class WafLogParser {
             rule_message: '',
             rule_data: '',
             severity: 'WARNING',
+            rules: [],
             is_attack: false
           };
           currentSection = 'A';
@@ -200,7 +240,7 @@ class WafLogParser {
         } else if (section === 'Z') {
           // Entry selesai
           if (currentEntry) {
-            currentEntry.is_attack = Boolean(currentEntry.rule_id || currentEntry.rule_message);
+            finalizeEntry(currentEntry);
             entries.push(currentEntry);
           }
           currentEntry = null;
@@ -251,22 +291,21 @@ class WafLogParser {
       }
       // Section H atau Section K: Audit log messages (ModSecurity attack rule matches)
       else if (currentSection === 'H' || currentSection === 'K') {
-        if (line.includes('Message:') || line.includes('msg "')) {
-          const msgMatch = line.match(/Message:\s*(.*?)(?=\s*\[file|\s*$)/) || line.match(/\[msg\s+"(.*?)"\]/);
-          if (msgMatch && !currentEntry.rule_message) {
-            currentEntry.rule_message = msgMatch[1];
-          }
+        // Satu baris = satu rule yang terpicu. Kumpulkan semuanya; rule utama
+        // dipilih saat entri selesai (lihat finalizeEntry).
+        if (line.includes('Message:') || line.includes('msg "') || line.includes('[id "')) {
+          const msgMatch = line.match(/\[msg\s+"(.*?)"\]/) || line.match(/Message:\s*(.*?)(?=\s*\[file|\s*$)/);
           const idMatch = line.match(/\[id\s+"(\d+)"\]/);
-          if (idMatch && !currentEntry.rule_id) {
-            currentEntry.rule_id = idMatch[1];
-          }
-          const sevMatch = line.match(/\[severity\s+"([A-Z]+)"\]/i);
-          if (sevMatch && currentEntry.severity === 'WARNING') {
-            currentEntry.severity = sevMatch[1].toUpperCase();
-          }
+          const sevMatch = line.match(/\[severity\s+"([A-Za-z]+|\d)"\]/);
           const dataMatch = line.match(/\[data\s+"(.*?)"\]/);
-          if (dataMatch && !currentEntry.rule_data) {
-            currentEntry.rule_data = dataMatch[1];
+          if (idMatch || msgMatch) {
+            currentEntry.rules.push({
+              id: idMatch ? idMatch[1] : '',
+              message: msgMatch ? msgMatch[1] : '',
+              // ModSecurity v3 menulis severity sebagai angka syslog ("2") atau nama ("CRITICAL")
+              severity: (sevMatch && normalizeSeverity(sevMatch[1])) || 'WARNING',
+              data: dataMatch ? dataMatch[1] : ''
+            });
           }
         }
       }
