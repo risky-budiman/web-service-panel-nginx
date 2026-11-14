@@ -57,7 +57,8 @@ before(async () => {
       NGINX_CONF_DIR: path.join(tmp, 'conf'),
       NGINX_LOG_DIR: path.join(tmp, 'logs'),
       MODSEC_AUDIT_LOG: path.join(tmp, 'modsec_audit.log'),
-      LOGIN_RATE_LIMIT: '5'
+      LOGIN_RATE_LIMIT: '5',
+      PANEL_SYSTEM_COMMANDS: 'off'
     },
     stdio: ['ignore', 'pipe', 'pipe']
   });

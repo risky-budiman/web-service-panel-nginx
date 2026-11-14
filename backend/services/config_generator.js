@@ -383,7 +383,7 @@ function generateConfig(proxy) {
   let useSsl = Boolean(proxy.ssl_enabled);
 
   // Jika di Linux, pastikan sertifikat Let's Encrypt benar-benar ada di disk
-  if (useSsl && process.platform === 'linux') {
+  if (useSsl && require('./system_executor').systemCommandsEnabled) {
     const clean = (proxy.domain_name || '').trim().toLowerCase();
     const apex = clean.startsWith('www.') ? clean.substring(4) : clean;
     const candidates = [clean, apex, `www.${apex}`];
@@ -601,7 +601,7 @@ function generateOptimizationGlobals() {
   const filepath = path.join(NGINX_CONF_DIR, '00-optimization-globals.conf');
 
   // Pastikan folder cache ada jika di Linux
-  if (process.platform === 'linux') {
+  if (require('./system_executor').systemCommandsEnabled) {
     try {
       if (!fs.existsSync('/tmp/nginx_panel_cache')) {
         fs.mkdirSync('/tmp/nginx_panel_cache', { recursive: true, mode: 0o777 });

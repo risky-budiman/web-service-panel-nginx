@@ -20,7 +20,7 @@ function configRejected(res, applyResult) {
  * Mengembalikan pesan peringatan (string) bila gagal, atau null.
  */
 async function ensureCertificate(proxy) {
-  if (!proxy.ssl_enabled || process.platform !== 'linux') return null;
+  if (!proxy.ssl_enabled || !systemExec.systemCommandsEnabled) return null;
   if (systemExec.hasCertificate(proxy.domain_name)) return null;
 
   console.log(`🔐 Mengambil sertifikat SSL otomatis untuk ${proxy.domain_name}...`);

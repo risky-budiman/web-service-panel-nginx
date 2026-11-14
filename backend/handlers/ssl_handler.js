@@ -49,7 +49,7 @@ async function requestSsl(req, res) {
       return res.status(404).json({ success: false, message: 'Proxy domain tidak ditemukan' });
     }
 
-    if (process.platform === 'linux') {
+    if (systemExec.systemCommandsEnabled) {
       const certResult = await systemExec.obtainCertificate(proxy.domain_name);
       if (!certResult.success) {
         return res.status(502).json({
@@ -91,7 +91,7 @@ async function toggleSsl(req, res) {
 
     const nextSsl = proxy.ssl_enabled ? 0 : 1;
 
-    if (nextSsl && process.platform === 'linux' && !systemExec.hasCertificate(proxy.domain_name)) {
+    if (nextSsl && systemExec.systemCommandsEnabled && !systemExec.hasCertificate(proxy.domain_name)) {
       const certResult = await systemExec.obtainCertificate(proxy.domain_name);
       if (!certResult.success) {
         return res.status(502).json({

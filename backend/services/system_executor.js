@@ -3,8 +3,10 @@ const util = require('util');
 
 const execAsync = util.promisify(exec);
 
-// Deteksi OS — perintah hanya berjalan di Linux
-const isLinux = process.platform === 'linux';
+// Perintah sistem (nginx, certbot, systemctl) hanya dijalankan di Linux.
+// PANEL_SYSTEM_COMMANDS=off mematikannya — dipakai oleh test & CI yang berjalan di Linux
+// tanpa Nginx. Di server produksi variabel ini tidak di-set.
+const isLinux = process.platform === 'linux' && process.env.PANEL_SYSTEM_COMMANDS !== 'off';
 
 /**
  * Test konfigurasi Nginx (nginx -t)
@@ -199,4 +201,7 @@ async function getNginxStatus() {
   }
 }
 
-module.exports = { testConfig, reloadNginx, getNginxStatus, hasCertificate, obtainCertificate, getCertificateInfo };
+module.exports = {
+  testConfig, reloadNginx, getNginxStatus, hasCertificate, obtainCertificate, getCertificateInfo,
+  systemCommandsEnabled: isLinux
+};

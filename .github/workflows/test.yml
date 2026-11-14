@@ -2,18 +2,27 @@ name: Test
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Jangan jalankan nginx/certbot/systemctl sungguhan di runner CI
+      PANEL_SYSTEM_COMMANDS: 'off'
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 20   # sama dengan versi di server produksi (deploy.sh)
 
       - name: Backend — install & test
         working-directory: backend
@@ -27,5 +36,12 @@ jobs:
           npm ci
           npm run build
 
+      - name: Shell scripts — syntax check
+        run: |
+          for f in deploy.sh scripts/*.sh tests/*.sh; do bash -n "$f" && echo "OK  $f"; done
+
       - name: ModSecurity setup script — test
         run: bash tests/test-setup-modsec.sh
+
+      - name: check-hosts.js — smoke test
+        run: node scripts/check-hosts.js --db /nonexistent/panel.db

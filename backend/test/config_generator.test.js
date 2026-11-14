@@ -6,6 +6,7 @@ const path = require('path');
 
 const confDir = fs.mkdtempSync(path.join(os.tmpdir(), 'panel-conf-'));
 process.env.NGINX_CONF_DIR = confDir;
+process.env.PANEL_SYSTEM_COMMANDS = 'off';
 
 const configGen = require('../services/config_generator');
 const systemExec = require('../services/system_executor');
