@@ -39,50 +39,10 @@ echo "📁 Menyiapkan direktori Nginx: $NGINX_CONF_DIR..."
 sudo mkdir -p $NGINX_CONF_DIR
 
 # 2.1 Siapkan ModSecurity & OWASP Core Rule Set (CRS)
-MODSEC_DIR="/etc/nginx/modsec"
-echo "🛡️ Menyiapkan ModSecurity & OWASP CRS di $MODSEC_DIR..."
-sudo mkdir -p $MODSEC_DIR
-
-# Download default modsecurity.conf jika belum ada
-if [ ! -f "$MODSEC_DIR/modsecurity.conf" ]; then
-    echo "📥 Mengunduh konfigurasi dasar ModSecurity v3.0.4..."
-    sudo curl -fsSL -o "$MODSEC_DIR/modsecurity.conf" https://raw.githubusercontent.com/owasp-modsecurity/ModSecurity/v3.0.4/modsecurity.conf-recommended || true
-    sudo curl -fsSL -o "$MODSEC_DIR/unicode.mapping" https://raw.githubusercontent.com/owasp-modsecurity/ModSecurity/v3.0.4/unicode.mapping || true
-fi
-
-# Pastikan audit log dan rule engine aktif di modsecurity.conf
-if [ -f "$MODSEC_DIR/modsecurity.conf" ]; then
-    sudo sed -i 's/SecRuleEngine DetectionOnly/SecRuleEngine On/g' "$MODSEC_DIR/modsecurity.conf" 2>/dev/null || true
-    sudo sed -i 's/SecAuditEngine RelevantOnly/SecAuditEngine On/g' "$MODSEC_DIR/modsecurity.conf" 2>/dev/null || true
-    sudo sed -i 's|SecAuditLog /var/log/.*|SecAuditLog /var/log/modsec_audit.log|g' "$MODSEC_DIR/modsecurity.conf" 2>/dev/null || true
-fi
-
-# Setup OWASP CRS jika belum ada
-if [ ! -d "$MODSEC_DIR/owasp-crs" ]; then
-    echo "📥 Mengkloning OWASP Core Rule Set (CRS v3.3.5 LTS)..."
-    sudo git clone --depth 1 -b v3.3.5 https://github.com/coreruleset/coreruleset.git "$MODSEC_DIR/owasp-crs" || true
-    if [ -f "$MODSEC_DIR/owasp-crs/crs-setup.conf.example" ]; then
-        sudo cp "$MODSEC_DIR/owasp-crs/crs-setup.conf.example" "$MODSEC_DIR/owasp-crs/crs-setup.conf"
-    fi
-    # Disable rule 922 yang membutuhkan modul v3.0.8+
-    if [ -f "$MODSEC_DIR/owasp-crs/rules/REQUEST-922-MULTIPART-ATTACK.conf" ]; then
-        sudo mv "$MODSEC_DIR/owasp-crs/rules/REQUEST-922-MULTIPART-ATTACK.conf" "$MODSEC_DIR/owasp-crs/rules/REQUEST-922-MULTIPART-ATTACK.conf.bak" || true
-    fi
-fi
-
-# Buat /etc/nginx/modsec/main.conf
-if [ ! -f "$MODSEC_DIR/main.conf" ]; then
-    echo "⚙️ Membuat $MODSEC_DIR/main.conf..."
-    sudo tee "$MODSEC_DIR/main.conf" > /dev/null << 'EOF'
-Include /etc/nginx/modsec/modsecurity.conf
-Include /etc/nginx/modsec/owasp-crs/crs-setup.conf
-Include /etc/nginx/modsec/owasp-crs/rules/*.conf
-EOF
-fi
-
-# Siapkan file audit log ModSecurity dengan izin akses yang tepat
-sudo touch /var/log/modsec_audit.log
-sudo chmod 666 /var/log/modsec_audit.log || true
+# Konfigurasi lengkap (method REST, body limit, pengecualian false positive,
+# izin audit log, logrotate, validasi + rollback) ada di scripts/setup-modsec.sh
+DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+sudo bash "$DEPLOY_DIR/scripts/setup-modsec.sh"
 
 # Pastikan /etc/nginx/nginx.conf memuat include /etc/nginx/panel-conf.d/*.conf;
 if ! grep -q "panel-conf.d" /etc/nginx/nginx.conf; then
@@ -102,7 +62,7 @@ cd ..
 # 4. Install dependensi Backend
 echo "📦 Menyiapkan Backend..."
 cd backend
-npm install --production
+npm install --omit=dev
 
 # Buat file environment jika belum ada
 if [ ! -f .env ]; then
@@ -110,7 +70,16 @@ if [ ! -f .env ]; then
     echo "JWT_SECRET=$(openssl rand -hex 32)" >> .env
     echo "NGINX_CONF_DIR=/etc/nginx/panel-conf.d" >> .env
     echo "MODSEC_AUDIT_LOG=/var/log/modsec_audit.log" >> .env
+    echo "# Setelah panel diakses lewat domain + HTTPS, aktifkan baris berikut:" >> .env
+    echo "# HOST=127.0.0.1" >> .env
+    echo "# Email notifikasi kedaluwarsa sertifikat Let's Encrypt:" >> .env
+    echo "# CERTBOT_EMAIL=admin@domain-anda.com" >> .env
 fi
+# Pastikan JWT_SECRET selalu ada (instalasi lama)
+if ! grep -qE '^JWT_SECRET=.{32,}' .env; then
+    echo "JWT_SECRET=$(openssl rand -hex 32)" >> .env
+fi
+chmod 600 .env
 
 # 5. Jalankan aplikasi menggunakan PM2
 echo "⚡ Menjalankan backend dengan PM2..."
@@ -122,7 +91,7 @@ pm2 startup || true
 echo "=============================================================================="
 echo "✅ DEPLOYMENT BERHASIL!"
 echo "🌐 Buka panel di browser: http://<IP_VPS_ANDA>:3000"
-echo "👤 Akun Default: admin / admin123"
+echo "👤 Akun Default: admin / admin123 (wajib diganti saat login pertama)"
 echo "🛡️ ModSecurity & OWASP CRS telah terpasang dan aktif!"
-echo "⚠️  PENTING: Segera ubah password default di menu Settings!"
+echo "🔒 Disarankan: akses panel via domain + HTTPS lalu set HOST=127.0.0.1 di backend/.env"
 echo "=============================================================================="
