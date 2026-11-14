@@ -44,7 +44,7 @@ test('generateConfig menolak data proxy berbahaya dari database lama', () => {
 
 test('template: webhook regex dikunci, cache tidak dipakai untuk request ber-Authorization', () => {
   const { config } = configGen.generateConfig({ ...baseProxy });
-  assert.match(config, /webhook-test\)\(\/\|\$\) \{/);
+  assert.match(config, /webhook-waiting\)\(\/\|\$\) \{/);
   assert.match(config, /proxy_no_cache \$http_authorization;/);
   assert.match(config, /proxy_cache_bypass \$http_authorization;/);
 });
@@ -111,4 +111,32 @@ test('applyConfigChange: ganti domain lalu gagal → config domain lama kembali'
   assert.strictEqual(r.success, false);
   assert.strictEqual(fs.readFileSync(confPath(oldD), 'utf8'), 'OLD');
   assert.ok(!fs.existsSync(confPath(newD)));
+});
+
+test('template: /webhook-waiting/ ikut bypass WAF, tanpa sub_filter', () => {
+  const { config } = configGen.generateConfig({ ...baseProxy });
+  assert.match(config, /webhook-test\|webhook-waiting\)\(\/\|\$\) \{/);
+  assert.doesNotMatch(config, /sub_filter|Accept-Encoding/);
+});
+
+test('regenerateAllConfigs: Nginx menolak → seluruh folder config dikembalikan', async () => {
+  const ProxyModel = require('../models/proxy');
+  const originalGetAll = ProxyModel.getAll;
+  ProxyModel.getAll = () => [{ ...baseProxy, domain_name: 'regen.example.com' }];
+
+  for (const f of fs.readdirSync(confDir)) fs.rmSync(path.join(confDir, f));
+  fs.writeFileSync(confPath('regen.example.com'), 'LAMA');
+  fs.writeFileSync(path.join(confDir, '00-optimization-globals.conf'), 'GLOBAL LAMA');
+  systemExec.reloadNginx = async () => ({ success: false, message: 'fail', testResult: { output: 'emerg' } });
+
+  try {
+    const r = await configGen.regenerateAllConfigs();
+    assert.strictEqual(r.success, false);
+    assert.strictEqual(r.rolledBack, true);
+    assert.strictEqual(fs.readFileSync(confPath('regen.example.com'), 'utf8'), 'LAMA');
+    assert.strictEqual(fs.readFileSync(path.join(confDir, '00-optimization-globals.conf'), 'utf8'), 'GLOBAL LAMA');
+    assert.ok(!fs.existsSync(path.join(confDir, '00-default-block.conf')), 'file baru harus dihapus');
+  } finally {
+    ProxyModel.getAll = originalGetAll;
+  }
 });

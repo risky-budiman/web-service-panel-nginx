@@ -211,3 +211,20 @@ test('rate limit login: percobaan gagal berlebihan → 429 (dijalankan terakhir)
   for (let i = 0; i < 6; i++) last = await login('admin', 'salah-' + i);
   assert.strictEqual(last.status, 429);
 });
+
+test('endpoint API tidak dikenal → 404 JSON', async () => {
+  const r = await api('GET', '/api/tidak-ada', { token });
+  assert.strictEqual(r.status, 404);
+  assert.strictEqual(r.data.success, false);
+});
+
+test('index.html tidak di-cache, aset ber-hash di-cache immutable', async () => {
+  const distDir = path.join(__dirname, '..', '..', 'frontend', 'dist');
+  if (!fs.existsSync(path.join(distDir, 'index.html'))) return; // frontend belum di-build
+  const page = await fetch(base + '/?tab=ssl');
+  assert.strictEqual(page.headers.get('cache-control'), 'no-cache');
+  const asset = fs.readdirSync(path.join(distDir, 'assets')).find(f => f.endsWith('.js'));
+  const res = await fetch(`${base}/assets/${asset}`);
+  assert.strictEqual(res.status, 200);
+  assert.match(res.headers.get('cache-control'), /immutable/);
+});

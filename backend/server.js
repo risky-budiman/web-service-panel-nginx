@@ -59,7 +59,18 @@ const loginLimiter = rateLimit({
 });
 
 // ─── Static Files (Vue.js build) ────────────────────────────
-app.use(express.static(path.join(__dirname, '..', 'frontend', 'dist')));
+// File di /assets punya hash di namanya → aman di-cache 1 tahun.
+// index.html selalu divalidasi ulang agar versi baru langsung terpakai setelah deploy.
+app.use(express.static(path.join(__dirname, '..', 'frontend', 'dist'), {
+  index: false,
+  setHeaders(res, filePath) {
+    if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    } else {
+      res.setHeader('Cache-Control', 'no-cache');
+    }
+  }
+}));
 
 // ─── API Routes: Auth ───────────────────────────────────────
 app.post('/api/auth/login', loginLimiter, authHandler.login);
@@ -110,11 +121,17 @@ app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'Nginx Proxy Panel is running', timestamp: new Date().toISOString() });
 });
 
+// Endpoint API yang tidak dikenal → 404 JSON (bukan halaman HTML)
+app.all('/api/{*path}', (req, res) => {
+  res.status(404).json({ success: false, message: 'Endpoint tidak ditemukan' });
+});
+
 // ─── SPA Fallback ───────────────────────────────────────────
 app.get('{*path}', (req, res) => {
   const indexPath = path.join(__dirname, '..', 'frontend', 'dist', 'index.html');
   const fs = require('fs');
   if (fs.existsSync(indexPath)) {
+    res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(indexPath);
   } else {
     res.json({
@@ -144,14 +161,13 @@ async function startServer() {
     await initDb();
     console.log('✅ Database initialized');
 
-    // Otomatis pastikan optimasi global Nginx dan blokir IP aktif
+    // Regenerasi config global + seluruh domain (dengan rollback jika Nginx menolak)
     const configGen = require('./services/config_generator');
-    configGen.generateOptimizationGlobals();
-    configGen.generateDefaultCatchAll();
-
-    // Otomatis regenerasi konfigurasi seluruh domain aktif dengan akselerasi terbaru
     try {
-      await configGen.regenerateAllConfigs();
+      const regen = await configGen.regenerateAllConfigs();
+      if (!regen.success) {
+        console.warn('⚠️ Config baru ditolak Nginx saat start; config lama dipertahankan. Cek: sudo nginx -t');
+      }
     } catch (regenErr) {
       console.warn('⚠️ Gagal regenerasi config saat start:', regenErr.message);
     }

@@ -185,7 +185,7 @@ ${modSecBlock}
     }
 
     # Khusus OAuth2 Callback & Webhooks (Bypass WAF false-positives & buffering)
-    location ~* ^/(rest/oauth2-credential/callback|webhook|webhook-test)(/|$) {
+    location ~* ^/(rest/oauth2-credential/callback|webhook|webhook-test|webhook-waiting)(/|$) {
         proxy_pass http://${upstreamName};
         proxy_http_version 1.1;
 
@@ -328,14 +328,8 @@ ${modSecBlock}
         proxy_cookie_path ~^(.*)$ "$1; Secure";
 
         # Header Browser CSP: otomatis ubah semua link aset internal http:// menjadi https://
+        # (menggantikan sub_filter, sehingga respons backend tetap terkompresi end-to-end)
         add_header Content-Security-Policy "upgrade-insecure-requests" always;
-
-        # Mixed-content rewrite ringan khusus HTML (tidak membebani JSON / API / JS)
-        # sub_filter tidak bisa membaca respons gzip dari backend → minta respons tanpa kompresi
-        # (Nginx tetap mengompres ulang ke browser via gzip global).
-        proxy_set_header Accept-Encoding "";
-        sub_filter 'http://${proxy.domain_name}' 'https://${proxy.domain_name}';
-        sub_filter_once off;
 
         # Timeouts panjang untuk workflow n8n & execution streaming
         proxy_connect_timeout 60s;
@@ -344,7 +338,7 @@ ${modSecBlock}
     }
 
     # Khusus OAuth2 Callback & Webhooks (Bypass WAF false-positives & buffering)
-    location ~* ^/(rest/oauth2-credential/callback|webhook|webhook-test)(/|$) {
+    location ~* ^/(rest/oauth2-credential/callback|webhook|webhook-test|webhook-waiting)(/|$) {
         proxy_pass http://${upstreamName};
         proxy_http_version 1.1;
 
@@ -687,6 +681,20 @@ async function regenerateAllConfigs() {
   const ProxyModel = require('../models/proxy');
   const systemExec = require('./system_executor');
 
+  // 0. Snapshot seluruh isi folder config agar bisa dikembalikan jika Nginx menolak
+  const snapshot = new Map();
+  for (const name of fs.readdirSync(NGINX_CONF_DIR)) {
+    const file = path.join(NGINX_CONF_DIR, name);
+    if (fs.statSync(file).isFile()) snapshot.set(file, fs.readFileSync(file));
+  }
+  const restoreSnapshot = () => {
+    for (const name of fs.readdirSync(NGINX_CONF_DIR)) {
+      const file = path.join(NGINX_CONF_DIR, name);
+      if (!snapshot.has(file) && fs.statSync(file).isFile()) fs.unlinkSync(file);
+    }
+    for (const [file, content] of snapshot) fs.writeFileSync(file, content);
+  };
+
   // 1. Tulis konfigurasi dasar global
   generateOptimizationGlobals();
   generateDefaultCatchAll();
@@ -714,7 +722,14 @@ async function regenerateAllConfigs() {
 
   // 3. Reload Nginx jika di server Linux
   const reloadResult = await systemExec.reloadNginx();
-  return { success: reloadResult.success, count, skipped, reloadResult };
+  if (!reloadResult.success) {
+    // Nginx tetap memakai config lama di memori; kembalikan file di disk agar konsisten
+    restoreSnapshot();
+    const output = reloadResult.testResult?.output || reloadResult.error || '';
+    console.error('❌ Regenerasi config ditolak Nginx, semua file dikembalikan:', output);
+    return { success: false, rolledBack: true, count, skipped, reloadResult };
+  }
+  return { success: true, count, skipped, reloadResult };
 }
 
 module.exports = {
