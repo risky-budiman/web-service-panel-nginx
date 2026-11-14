@@ -92,6 +92,8 @@ on_error() {
     elif [ "$STAGE" = "backup" ]; then
         fail "Gagal saat backup — belum ada yang diubah. Menyalakan kembali panel..."
         pm2 start "$PM2_NAME" >/dev/null 2>&1 || true
+    else
+        fail "Pemeriksaan awal gagal (exit $code) pada baris ${BASH_LINENO[0]} — tidak ada yang diubah."
     fi
     exit "$code"
 }
@@ -137,10 +139,11 @@ git log --oneline -15 "HEAD..$TARGET" | sed 's/^/      /'
 TMP_CHECK="$(mktemp -d)"
 git show "$TARGET:backend/middleware/validator.js" > "$TMP_CHECK/validator.js"
 git show "$TARGET:scripts/check-hosts.js" > "$TMP_CHECK/check-hosts.js"
-set +e
-node "$TMP_CHECK/check-hosts.js" --root "$APP_DIR" --db "$APP_DIR/$DB_REL" --validator "$TMP_CHECK/validator.js" | sed 's/^/      /'
-CHECK_RC=${PIPESTATUS[0]}
-set -e
+# "|| CHECK_RC=$?" → exit code 1 (ada host tidak valid) tidak memicu trap ERR
+CHECK_RC=0
+node "$TMP_CHECK/check-hosts.js" --root "$APP_DIR" --db "$APP_DIR/$DB_REL" --validator "$TMP_CHECK/validator.js" \
+    > "$TMP_CHECK/result.txt" 2>&1 || CHECK_RC=$?
+sed 's/^/      /' "$TMP_CHECK/result.txt"
 rm -rf "$TMP_CHECK"
 if [ "$CHECK_RC" -eq 1 ] && [ "$ALLOW_INVALID" -ne 1 ]; then
     die "Ada host yang tidak lolos validasi baru. Perbaiki datanya, atau jalankan ulang dengan --allow-invalid-hosts"
@@ -301,10 +304,9 @@ fi
 pm2 save >/dev/null 2>&1 || true
 
 # Cek data host masih lengkap setelah panel start (jumlah sama dengan backup)
-set +e
-node scripts/check-hosts.js --db "$DB_REL" >/dev/null
-AFTER_RC=$?
-set -e
+# Exit 1 (ada host tidak valid, sudah diizinkan) bukan kegagalan; hanya exit ≥2 yang gagal
+AFTER_RC=0
+node scripts/check-hosts.js --db "$DB_REL" >/dev/null 2>&1 || AFTER_RC=$?
 [ "$AFTER_RC" -le 1 ] || { fail "Database tidak bisa dibaca setelah update"; false; }
 ok "Data host terbaca normal setelah update"
 
