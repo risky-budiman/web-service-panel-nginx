@@ -2,7 +2,7 @@
   <div class="login-page">
     <div class="login-card">
       <div class="login-header">
-        <div class="login-header-icon">🖥️</div>
+        <div class="login-header-icon"><Server :size="26" /></div>
         <h1>Nginx Proxy Panel</h1>
         <p>Masuk ke Control Panel</p>
       </div>
@@ -13,7 +13,7 @@
         <div class="form-group">
           <label class="form-label" for="username">Username</label>
           <div class="input-icon-wrapper">
-            <span class="input-icon">👤</span>
+            <User :size="16" class="input-icon" aria-hidden="true" />
             <input
               id="username"
               v-model="username"
@@ -29,7 +29,7 @@
         <div class="form-group">
           <label class="form-label" for="password">Password</label>
           <div class="input-icon-wrapper">
-            <span class="input-icon">🔑</span>
+            <KeyRound :size="16" class="input-icon" aria-hidden="true" />
             <input
               id="password"
               v-model="password"
@@ -49,7 +49,7 @@
           :disabled="loading"
         >
           <span v-if="loading" class="spinner"></span>
-          <span v-else>🔐 Masuk ke Panel</span>
+          <span v-else>Masuk ke Panel</span>
         </button>
       </form>
 
@@ -57,13 +57,14 @@
         v-if="isDev"
         style="text-align: center; margin-top: 20px; font-size: 12px; color: var(--text-muted); background: rgba(255, 255, 255, 0.03); padding: 6px 12px; border-radius: var(--radius-sm); border: 1px dashed var(--border-color);"
       >
-        🛠️ <em>Mode Dev: admin / admin123</em>
+        <em>Mode dev: admin / admin123</em>
       </p>
     </div>
   </div>
 </template>
 
 <script setup>
+import { Server, User, KeyRound } from 'lucide-vue-next'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api, { setStoredUser } from '../services/api.js'

@@ -22,6 +22,7 @@ export function setStoredUser(user) {
 export function clearSession() {
   localStorage.removeItem('token')
   localStorage.removeItem('user')
+  window.__clearToasts?.()
 }
 
 // Interceptor: tambah token ke setiap request

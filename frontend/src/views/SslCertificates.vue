@@ -2,7 +2,7 @@
   <div class="page-content">
     <div class="section-header">
       <div>
-        <h3>🔒 Sertifikat SSL / TLS</h3>
+        <h3>Sertifikat SSL / TLS</h3>
         <p class="section-desc">Kelola enkripsi HTTPS dan sertifikat SSL untuk domain Anda</p>
       </div>
     </div>
@@ -10,7 +10,7 @@
     <!-- Alert Info -->
     <div class="card" style="margin-bottom: 24px; border-left: 4px solid var(--accent-primary); background: rgba(99, 102, 241, 0.05); padding: 18px 22px;">
       <div style="display: flex; gap: 14px; align-items: flex-start;">
-        <span style="font-size: 24px;">ℹ️</span>
+        <Info :size="22" style="flex-shrink: 0; color: var(--accent-primary-hover);" aria-hidden="true" />
         <div>
           <h4 style="margin-bottom: 4px; font-size: 15px; color: var(--text-primary);">Otomasi SSL & HTTPS</h4>
           <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
@@ -27,7 +27,7 @@
       </div>
 
       <div v-else-if="certificates.length === 0" class="empty-state">
-        <div class="empty-state-icon">🔒</div>
+        <div class="empty-state-icon"><Lock :size="44" :stroke-width="1.5" /></div>
         <h3>Belum Ada Domain</h3>
         <p>Silakan buat proxy domain terlebih dahulu di menu Dashboard.</p>
       </div>
@@ -57,8 +57,15 @@
               </span>
             </td>
             <td>
+              <span
+                v-if="cert.status === 'Expired'"
+                class="badge badge-error"
+                title="Sertifikat sudah kedaluwarsa. Klik Renew untuk memperbarui."
+              >
+                <CircleX :size="13" aria-hidden="true" /> Kedaluwarsa
+              </span>
               <span 
-                v-if="cert.ssl_enabled && cert.has_cert" 
+                v-else-if="cert.ssl_enabled && cert.has_cert" 
                 class="badge badge-active"
               >
                 <span class="badge-dot badge-dot-active"></span>
@@ -70,7 +77,7 @@
                 style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3);"
                 title="SSL aktif di panel namun file sertifikat belum ditemukan di VPS"
               >
-                ⚠️ Missing Cert
+                <TriangleAlert :size="13" aria-hidden="true" /> Missing Cert
               </span>
               <span 
                 v-else-if="!cert.ssl_enabled && cert.has_cert" 
@@ -88,11 +95,17 @@
               </span>
             </td>
             <td style="color: var(--text-secondary); font-size: 13px;">
-              {{ cert.expires_at ? formatDate(cert.expires_at) : '-' }}
+              <template v-if="cert.expires_at">
+                {{ formatDate(cert.expires_at) }}
+                <div :class="expiryClass(cert.expires_at)" style="font-size: 12px;">
+                  {{ expiryLabel(cert.expires_at) }}
+                </div>
+              </template>
+              <template v-else>-</template>
             </td>
             <td>
               <span v-if="cert.ssl_enabled && cert.has_cert" style="color: var(--accent-success); font-size: 13px; font-weight: 500;">
-                ✓ Aktif
+                <CircleCheck :size="14" aria-hidden="true" style="vertical-align: -2px;" /> Aktif
               </span>
               <span v-else style="color: var(--text-muted); font-size: 13px;">
                 -
@@ -115,7 +128,7 @@
                   @click="enableSsl(cert)"
                   :title="cert.ssl_enabled ? 'Terbitkan ulang / Perbarui sertifikat Let\'s Encrypt' : 'Terbitkan sertifikat baru'"
                 >
-                  {{ actionLoading === cert.id ? 'Memproses...' : (cert.ssl_enabled ? '🔄 Renew' : '⚡ Request SSL') }}
+                  {{ actionLoading === cert.id ? 'Memproses...' : (cert.ssl_enabled ? 'Renew' : 'Request SSL') }}
                 </button>
               </div>
             </td>
@@ -128,6 +141,7 @@
 </template>
 
 <script setup>
+import { Lock, CircleX, TriangleAlert, CircleCheck, Info } from 'lucide-vue-next'
 import { ref, onMounted } from 'vue'
 import api from '../services/api.js'
 
@@ -175,6 +189,24 @@ async function toggleSslStatus(cert) {
   } finally {
     actionLoading.value = null
   }
+}
+
+function daysLeft(dateStr) {
+  return Math.floor((new Date(dateStr).getTime() - Date.now()) / 86400000)
+}
+
+function expiryLabel(dateStr) {
+  const days = daysLeft(dateStr)
+  if (days < 0) return `kedaluwarsa ${-days} hari lalu`
+  if (days === 0) return 'kedaluwarsa hari ini'
+  return `${days} hari lagi`
+}
+
+function expiryClass(dateStr) {
+  const days = daysLeft(dateStr)
+  if (days < 7) return 'cert-expiry-danger'
+  if (days < 21) return 'cert-expiry-warn'
+  return ''
 }
 
 function formatDate(dateStr) {

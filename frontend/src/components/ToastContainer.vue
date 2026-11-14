@@ -7,16 +7,20 @@
         :class="['toast', toast.type]"
       >
         <span class="toast-icon">
-          {{ toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : 'ℹ️' }}
+          <CircleCheck v-if="toast.type === 'success'" :size="18" />
+          <CircleX v-else-if="toast.type === 'error'" :size="18" />
+          <TriangleAlert v-else-if="toast.type === 'warning'" :size="18" />
+          <Info v-else :size="18" />
         </span>
         <span class="toast-message">{{ toast.message }}</span>
-        <button class="toast-close" @click="removeToast(toast.id)">✕</button>
+        <button class="toast-close" aria-label="Tutup notifikasi" @click="removeToast(toast.id)"><X :size="15" /></button>
       </div>
     </TransitionGroup>
   </div>
 </template>
 
 <script setup>
+import { CircleCheck, CircleX, TriangleAlert, Info, X } from 'lucide-vue-next'
 import { ref } from 'vue'
 
 const toasts = ref([])
@@ -38,6 +42,7 @@ defineExpose({ addToast })
 
 // Make available globally via event bus
 window.__toast = addToast
+window.__clearToasts = () => { toasts.value = [] }
 </script>
 
 <style scoped>

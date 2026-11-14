@@ -3,9 +3,6 @@
     <!-- Header Section -->
     <div class="section-header waf-header-row">
       <div>
-        <h2 class="waf-title">
-          <span>🛡️</span> Web Application Firewall (WAF)
-        </h2>
         <p class="section-desc">
           Monitoring real-time deteksi ancaman, audit log OWASP Core Rule Set (CRS), dan status proteksi ModSecurity
         </p>
@@ -18,12 +15,12 @@
           @click="toggleAutoRefresh"
           title="Polling otomatis setiap 5 detik"
         >
-          <span :style="{ display: 'inline-block', transform: autoRefresh ? 'rotate(180deg)' : 'none', transition: 'transform 0.4s' }">⚡</span>
+          <Activity :size="15" :class="{ 'icon-pulse': autoRefresh }" aria-hidden="true" />
           <span>{{ autoRefresh ? 'Live (5s)' : 'Auto Refresh Off' }}</span>
         </button>
 
         <button class="btn btn-secondary btn-sm" @click="fetchData(false)" :disabled="loading">
-          <span>🔄</span> <span>{{ loading ? 'Memuat...' : 'Refresh' }}</span>
+          <RefreshCw :size="15" :class="{ 'icon-spin': loading }" aria-hidden="true" /> <span>{{ loading ? 'Memuat...' : 'Refresh' }}</span>
         </button>
       </div>
     </div>
@@ -31,7 +28,7 @@
     <!-- Alert Status Log Server (Jika belum di Linux / log kosong) -->
     <div v-if="!logData.available" class="card waf-alert-card">
       <div class="waf-alert-content">
-        <div style="font-size: 24px; line-height: 1;">💡</div>
+        <Info :size="22" style="flex-shrink: 0; color: var(--accent-warning);" aria-hidden="true" />
         <div>
           <h4 style="font-size: 14px; font-weight: 600; color: var(--accent-warning); margin-bottom: 4px;">
             Status Server ModSecurity
@@ -47,7 +44,7 @@
     <!-- Stats Grid Cards -->
     <div class="stats-grid waf-stats-grid" style="margin-bottom: 24px;">
       <div class="stat-card">
-        <div class="stat-icon" style="background: rgba(239, 68, 68, 0.15); color: #ef4444;">🚨</div>
+        <div class="stat-icon" style="background: rgba(239, 68, 68, 0.15); color: #f87171;"><Siren :size="22" /></div>
         <div class="stat-info">
           <h3>{{ stats.total_attacks || 0 }}</h3>
           <p>Serangan Nyata Terdeteksi</p>
@@ -55,7 +52,7 @@
       </div>
 
       <div class="stat-card">
-        <div class="stat-icon" style="background: rgba(239, 68, 68, 0.15); color: #f87171;">🛑</div>
+        <div class="stat-icon" style="background: rgba(239, 68, 68, 0.15); color: #f87171;"><Ban :size="22" /></div>
         <div class="stat-info">
           <h3>{{ stats.total_blocked || 0 }}</h3>
           <p>Serangan Diblokir (403)</p>
@@ -63,7 +60,7 @@
       </div>
 
       <div class="stat-card">
-        <div class="stat-icon" style="background: rgba(59, 130, 246, 0.15); color: #3b82f6;">🎯</div>
+        <div class="stat-icon" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;"><Crosshair :size="22" /></div>
         <div class="stat-info">
           <h3>{{ stats.top_domains?.length || 0 }}</h3>
           <p>Target Domain Diserang</p>
@@ -71,7 +68,7 @@
       </div>
 
       <div class="stat-card">
-        <div class="stat-icon" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">🛡️</div>
+        <div class="stat-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;"><ShieldCheck :size="22" /></div>
         <div class="stat-info">
           <h3 style="font-size: 18px; line-height: 28px; color: #10b981;">OWASP CRS</h3>
           <p>WAF Engine Active</p>
@@ -84,7 +81,7 @@
       <!-- Top Attacker IPs -->
       <div class="card waf-card">
         <h3 class="waf-card-title">
-          <span style="display: flex; align-items: center; gap: 8px;"><span>🎯</span> Top 5 IP Penyerang</span>
+          <span style="display: flex; align-items: center; gap: 8px;"><Crosshair :size="16" aria-hidden="true" /> Top 5 IP Penyerang</span>
           <span class="waf-card-sub">Hits</span>
         </h3>
         <div v-if="!stats.top_ips || stats.top_ips.length === 0" class="empty-state" style="padding: 24px 0;">
@@ -107,7 +104,7 @@
       <!-- Top Triggered Rules -->
       <div class="card waf-card">
         <h3 class="waf-card-title">
-          <span style="display: flex; align-items: center; gap: 8px;"><span>📋</span> Kategori Ancaman Teratas</span>
+          <span style="display: flex; align-items: center; gap: 8px;"><ListOrdered :size="16" aria-hidden="true" /> Kategori Ancaman Teratas</span>
           <span class="waf-card-sub">Aturan</span>
         </h3>
         <div v-if="!stats.top_rules || stats.top_rules.length === 0" class="empty-state" style="padding: 24px 0;">
@@ -136,7 +133,7 @@
         <!-- Search Field -->
         <div class="logs-search-wrapper" style="flex: 1; min-width: 200px;">
           <div class="input-icon-wrapper">
-            <span class="input-icon">🔍</span>
+            <Search :size="15" class="input-icon" aria-hidden="true" />
             <input
               v-model="searchQuery"
               type="text"
@@ -162,21 +159,21 @@
             :class="categoryFilter === 'attacks' ? 'btn-primary' : 'btn-secondary'"
             @click="setCategoryFilter('attacks')"
           >
-            🛑 Serangan Nyata
+            <Siren :size="14" aria-hidden="true" /> Serangan Nyata
           </button>
           <button
             class="btn btn-sm"
             :class="categoryFilter === 'blocked' ? 'btn-primary' : 'btn-secondary'"
             @click="setCategoryFilter('blocked')"
           >
-            🚫 Blocked (403)
+            <Ban :size="14" aria-hidden="true" /> Blocked (403)
           </button>
           <button
             class="btn btn-sm"
             :class="categoryFilter === 'non_attacks' ? 'btn-primary' : 'btn-secondary'"
             @click="setCategoryFilter('non_attacks')"
           >
-            ℹ️ Non-Serangan
+            <Info :size="14" aria-hidden="true" /> Non-Serangan
           </button>
         </div>
 
@@ -200,7 +197,7 @@
       </div>
 
       <div v-else-if="!logData.logs || logData.logs.length === 0" class="empty-state" style="padding: 40px;">
-        <div class="empty-state-icon">🛡️</div>
+        <div class="empty-state-icon"><ShieldCheck :size="44" :stroke-width="1.5" /></div>
         <h3>Tidak Ada Event Ditemukan</h3>
         <p>Tidak ada data log yang cocok dengan filter yang dipilih.</p>
       </div>
@@ -229,14 +226,14 @@
                   class="badge" 
                   style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); font-weight: 600;"
                 >
-                  🛑 Serangan
+                  <Siren :size="13" aria-hidden="true" /> Serangan
                 </span>
                 <span 
                   v-else 
                   class="badge" 
                   style="background: rgba(148, 163, 184, 0.15); color: var(--text-secondary); border: 1px solid var(--border-color);"
                 >
-                  ℹ️ Info / HTTP Error
+                  <Info :size="13" aria-hidden="true" /> Info / HTTP Error
                 </span>
               </td>
               <td>
@@ -280,21 +277,21 @@
                   style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); font-weight: 600;"
                   title="Permintaan penyerang berhasil ditolak mentah-mentah oleh ModSecurity"
                 >
-                  🛑 DIBLOKIR (403)
+                  <Ban :size="13" aria-hidden="true" /> DIBLOKIR (403)
                 </span>
                 <span 
                   v-else-if="log.status_code >= 500" 
                   class="badge" 
                   style="background: rgba(239, 68, 68, 0.1); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.2);"
                 >
-                  💥 Server Error ({{ log.status_code }})
+                  <CircleX :size="13" aria-hidden="true" /> Server Error ({{ log.status_code }})
                 </span>
                 <span 
                   v-else 
                   class="badge" 
                   style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3);"
                 >
-                  ⚠️ Logged ({{ log.status_code || 'Audit' }})
+                  <TriangleAlert :size="13" aria-hidden="true" /> Logged ({{ log.status_code || 'Audit' }})
                 </span>
               </td>
             </tr>
@@ -306,6 +303,7 @@
 </template>
 
 <script setup>
+import { Activity, RefreshCw, Info, Siren, Ban, Crosshair, ShieldCheck, ListOrdered, Search, CircleX, TriangleAlert } from 'lucide-vue-next'
 import { ref, onMounted, onUnmounted } from 'vue'
 import api from '../services/api.js'
 
@@ -337,7 +335,8 @@ function toggleAutoRefresh() {
   autoRefresh.value = !autoRefresh.value
   if (autoRefresh.value) {
     pollTimer = setInterval(() => {
-      fetchData(true)
+      // Hemat server & baterai: jangan polling saat tab browser tidak terlihat
+      if (!document.hidden) fetchData(true)
     }, 5000)
     window.__toast?.('Live monitoring WAF aktif (tiap 5 detik)', 'info')
   } else {

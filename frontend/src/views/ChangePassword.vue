@@ -2,7 +2,7 @@
   <div class="login-page">
     <div class="login-card">
       <div class="login-header">
-        <div class="login-header-icon">🔐</div>
+        <div class="login-header-icon"><KeyRound :size="26" /></div>
         <h1>Ganti Password</h1>
         <p>Akun Anda masih memakai password default. Demi keamanan, buat password baru sebelum melanjutkan.</p>
       </div>
@@ -13,7 +13,7 @@
         <div class="form-group">
           <label class="form-label" for="current-password">Password Saat Ini</label>
           <div class="input-icon-wrapper">
-            <span class="input-icon">🔒</span>
+            <Lock :size="16" class="input-icon" aria-hidden="true" />
             <input
               id="current-password"
               v-model="currentPassword"
@@ -29,7 +29,7 @@
         <div class="form-group">
           <label class="form-label" for="new-password">Password Baru</label>
           <div class="input-icon-wrapper">
-            <span class="input-icon">✨</span>
+            <KeyRound :size="16" class="input-icon" aria-hidden="true" />
             <input
               id="new-password"
               v-model="newPassword"
@@ -46,7 +46,7 @@
         <div class="form-group">
           <label class="form-label" for="confirm-password">Konfirmasi Password Baru</label>
           <div class="input-icon-wrapper">
-            <span class="input-icon">🛡️</span>
+            <ShieldCheck :size="16" class="input-icon" aria-hidden="true" />
             <input
               id="confirm-password"
               v-model="confirmPassword"
@@ -66,7 +66,7 @@
           :disabled="loading"
         >
           <span v-if="loading" class="spinner"></span>
-          <span v-else>💾 Simpan Password Baru</span>
+          <span v-else>Simpan Password Baru</span>
         </button>
       </form>
 
@@ -83,6 +83,7 @@
 </template>
 
 <script setup>
+import { KeyRound, Lock, ShieldCheck } from 'lucide-vue-next'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api, { clearSession, getStoredUser, setStoredUser } from '../services/api.js'

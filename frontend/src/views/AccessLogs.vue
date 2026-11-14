@@ -2,7 +2,7 @@
   <div class="page-content">
     <div class="section-header">
       <div>
-        <h3>📋 Access Logs</h3>
+        <h3>Access Logs</h3>
         <p class="section-desc">Pantau lalu lintas HTTP & akses reverse proxy Nginx secara real-time</p>
       </div>
     </div>
@@ -10,10 +10,21 @@
     <!-- Filter & Action Toolbar -->
     <div class="card access-logs-toolbar" style="margin-bottom: 20px; padding: 16px 20px;">
       <div class="logs-toolbar-row">
+        <!-- Pilih sumber log -->
+        <select
+          v-model="selectedDomain"
+          class="form-input logs-domain-select"
+          aria-label="Sumber log"
+          @change="fetchLogs"
+        >
+          <option value="">Semua (access.log utama)</option>
+          <option v-for="d in domains" :key="d" :value="d">{{ d }}</option>
+        </select>
+
         <!-- Search Field -->
         <div class="logs-search-wrapper">
           <div class="input-icon-wrapper">
-            <span class="input-icon">🔍</span>
+            <Search :size="15" class="input-icon" aria-hidden="true" />
             <input
               v-model="searchQuery"
               type="text"
@@ -63,11 +74,11 @@
           </span>
           <button 
             class="btn btn-outline-danger btn-sm" 
-            @click="clearLogs"
+            @click="showClearConfirm = true"
             :disabled="logs.length === 0"
             title="Hapus seluruh histori log akses"
           >
-            🗑️ Bersihkan Log
+            <Trash2 :size="15" aria-hidden="true" /> Bersihkan Log
           </button>
         </div>
       </div>
@@ -80,9 +91,12 @@
       </div>
 
       <div v-else-if="filteredLogs.length === 0" class="empty-state">
-        <div class="empty-state-icon">📋</div>
+        <div class="empty-state-icon"><ScrollText :size="44" :stroke-width="1.5" /></div>
         <h3>Tidak Ada Log Ditemukan</h3>
-        <p>Belum ada request yang tercatat atau tidak cocok dengan filter.</p>
+        <p v-if="logAvailable === false">
+          File log <code>{{ logFile }}</code> belum ada di server. Log akan muncul setelah domain menerima request.
+        </p>
+        <p v-else>Belum ada request yang tercatat atau tidak cocok dengan filter.</p>
       </div>
 
       <div v-else class="table-wrapper">
@@ -128,42 +142,72 @@
         </table>
       </div>
     </div>
+    <ConfirmDialog
+      v-if="showClearConfirm"
+      title="Bersihkan Log"
+      :message="`Seluruh isi log ${selectedDomain || 'access.log utama'} akan dikosongkan. Tindakan ini tidak bisa dibatalkan.`"
+      :icon="Trash2"
+      confirm-text="Ya, Bersihkan"
+      :danger-mode="true"
+      @confirm="clearLogs"
+      @cancel="showClearConfirm = false"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import api from '../services/api.js'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
+import { Trash2, Search, ScrollText } from 'lucide-vue-next'
 
 const logs = ref([])
 const loading = ref(true)
 const searchQuery = ref('')
 const statusFilter = ref('all')
+const domains = ref([])
+const selectedDomain = ref('')
+const logFile = ref('')
+const logAvailable = ref(null)
+const showClearConfirm = ref(false)
 
 onMounted(() => {
+  fetchDomains()
   fetchLogs()
 })
+
+async function fetchDomains() {
+  try {
+    const res = await api.getProxies()
+    domains.value = res.data.data.map(p => p.domain_name).sort()
+  } catch (_) {
+    domains.value = []
+  }
+}
 
 async function fetchLogs() {
   loading.value = true
   try {
-    const res = await api.getLogs()
+    const res = await api.getLogs(selectedDomain.value || undefined)
     logs.value = res.data.data
+    logFile.value = res.data.log_file
+    logAvailable.value = res.data.available
   } catch (err) {
-    window.__toast?.('Gagal memuat log akses', 'error')
+    logs.value = []
+    window.__toast?.(err.response?.data?.message || 'Gagal memuat log akses', 'error')
   } finally {
     loading.value = false
   }
 }
 
 async function clearLogs() {
-  if (!confirm('Anda yakin ingin membersihkan seluruh catatan log?')) return
+  showClearConfirm.value = false
   try {
-    await api.clearLogs()
+    await api.clearLogs(selectedDomain.value || undefined)
     window.__toast?.('Log berhasil dibersihkan', 'success')
     fetchLogs()
   } catch (err) {
-    window.__toast?.('Gagal membersihkan log', 'error')
+    window.__toast?.(err.response?.data?.message || 'Gagal membersihkan log', 'error')
   }
 }
 

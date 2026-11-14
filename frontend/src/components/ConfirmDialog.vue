@@ -1,33 +1,68 @@
 <template>
-  <Teleport to="body">
-    <div class="modal-overlay" @click.self="$emit('cancel')">
-      <div class="modal" style="max-width: 400px;">
-        <div class="modal-body">
-          <div class="confirm-body">
-            <div class="confirm-icon">{{ icon }}</div>
-            <h3>{{ title }}</h3>
-            <p>{{ message }}</p>
-          </div>
-        </div>
-        <div class="modal-footer" style="justify-content: center;">
-          <button class="btn btn-secondary" @click="$emit('cancel')">Batal</button>
-          <button :class="['btn', dangerMode ? 'btn-danger' : 'btn-primary']" @click="$emit('confirm')">
-            {{ confirmText }}
-          </button>
-        </div>
-      </div>
-    </div>
-  </Teleport>
+  <BaseModal
+    :title="title"
+    :icon="resolvedIcon"
+    :tone="resolvedTone"
+    size="sm"
+    :busy="loading"
+    @close="$emit('cancel')"
+  >
+    <p class="cd-message">{{ message }}</p>
+    <slot />
+
+    <template #footer>
+      <button type="button" class="btn btn-secondary" :disabled="loading" :autofocus="resolvedTone === 'danger'" @click="$emit('cancel')">
+        {{ cancelText }}
+      </button>
+      <button
+        type="button"
+        :class="['btn', resolvedTone === 'danger' ? 'btn-danger' : 'btn-primary']"
+        :disabled="loading"
+        :autofocus="resolvedTone !== 'danger'"
+        @click="$emit('confirm')"
+      >
+        <LoaderCircle v-if="loading" :size="16" class="cd-spin" aria-hidden="true" />
+        {{ confirmText }}
+      </button>
+    </template>
+  </BaseModal>
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+import { TriangleAlert, LoaderCircle } from 'lucide-vue-next'
+import BaseModal from './BaseModal.vue'
+
+const props = defineProps({
   title: { type: String, default: 'Konfirmasi' },
   message: { type: String, default: 'Apakah Anda yakin?' },
-  icon: { type: String, default: '⚠️' },
+  icon: { type: [Object, Function], default: null },
+  tone: { type: String, default: '' },          // danger | warning | primary | info | success
   confirmText: { type: String, default: 'Ya, Lanjutkan' },
-  dangerMode: { type: Boolean, default: false }
+  cancelText: { type: String, default: 'Batal' },
+  dangerMode: { type: Boolean, default: false }, // kompatibilitas lama → tone danger
+  loading: { type: Boolean, default: false }
 })
 
 defineEmits(['confirm', 'cancel'])
+
+const resolvedTone = computed(() => props.tone || (props.dangerMode ? 'danger' : 'warning'))
+const resolvedIcon = computed(() => props.icon || TriangleAlert)
 </script>
+
+<style scoped>
+.cd-message {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.65;
+  color: #cbd5e1;
+}
+
+.cd-spin {
+  animation: cd-rotate 0.9s linear infinite;
+}
+
+@keyframes cd-rotate {
+  to { transform: rotate(360deg); }
+}
+</style>

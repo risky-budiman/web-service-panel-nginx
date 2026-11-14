@@ -2,7 +2,7 @@
   <div class="page-content">
     <div class="section-header">
       <div>
-        <h3>⚙️ Pengaturan & Status Sistem</h3>
+        <h3>Pengaturan & Status Sistem</h3>
         <p class="section-desc">Konfigurasi panel kontrol, keamanan akun, cadangan, dan pemulihan basis data</p>
       </div>
     </div>
@@ -11,7 +11,7 @@
       <!-- System Info Card -->
       <div class="card">
         <h4 style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
-          <span>🖥️</span> Informasi Server & Nginx
+          <Server :size="18" class="card-title-icon" aria-hidden="true" /> Informasi Server & Nginx
         </h4>
         <div v-if="loading" style="color: var(--text-secondary); padding: 12px 0;">
           Memuat informasi sistem...
@@ -43,23 +43,23 @@
       <!-- Performance & Acceleration Card -->
       <div class="card">
         <h4 style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
-          <span>🚀</span> Akselerasi & Optimasi Performa Nginx
+          <Rocket :size="18" class="card-title-icon" aria-hidden="true" /> Akselerasi & Optimasi Performa Nginx
         </h4>
         <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 14px;">
           Optimasi tingkat tinggi untuk reverse proxy: Upstream keepalive connection pooling, kompresi Gzip otomatis, SSL session cache, dan akselerasi file statis.
         </p>
         <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; margin-bottom: 16px; background: rgba(99, 102, 241, 0.05); padding: 12px; border-radius: 8px; border: 1px solid rgba(99, 102, 241, 0.15);">
           <div style="display: flex; align-items: center; gap: 8px;">
-            <span>⚡</span> <span><strong>Upstream Keepalive</strong>: 64 connection pool</span>
+            <Zap :size="15" class="feature-icon" aria-hidden="true" /> <span><strong>Upstream Keepalive</strong>: 64 connection pool</span>
           </div>
           <div style="display: flex; align-items: center; gap: 8px;">
-            <span>📦</span> <span><strong>Gzip Engine</strong>: Kompresi HTML, CSS, JS, JSON</span>
+            <Package :size="15" class="feature-icon" aria-hidden="true" /> <span><strong>Gzip Engine</strong>: Kompresi HTML, CSS, JS, JSON</span>
           </div>
           <div style="display: flex; align-items: center; gap: 8px;">
-            <span>🖼️</span> <span><strong>Static Cache</strong>: Cache browser 30 hari</span>
+            <HardDrive :size="15" class="feature-icon" aria-hidden="true" /> <span><strong>Static Cache</strong>: Cache browser 30 hari</span>
           </div>
           <div style="display: flex; align-items: center; gap: 8px;">
-            <span>🔒</span> <span><strong>SSL Cache</strong>: 10MB session resumption (1 hari)</span>
+            <Lock :size="15" class="feature-icon" aria-hidden="true" /> <span><strong>SSL Cache</strong>: 10MB session resumption (1 hari)</span>
           </div>
         </div>
         <button
@@ -69,7 +69,7 @@
           style="width: 100%; justify-content: center;"
         >
           <span v-if="optimizing" class="spinner"></span>
-          <span v-else>⚡</span>
+          <Zap v-else :size="16" aria-hidden="true" />
           {{ optimizing ? 'Mengoptimasi...' : 'Terapkan Optimasi ke Semua Domain' }}
         </button>
       </div>
@@ -77,7 +77,7 @@
       <!-- Backup & Restore Database Card -->
       <div class="card">
         <h4 style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
-          <span>💾</span> Backup & Restore Basis Data
+          <Database :size="18" class="card-title-icon" aria-hidden="true" /> Backup & Restore Basis Data
         </h4>
         <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 16px;">
           Unduh cadangan berkas database sewaktu-waktu atau pulihkan (restore) data dari file cadangan <code>.db</code> sebelumnya.
@@ -85,7 +85,7 @@
 
         <div style="display: flex; flex-direction: column; gap: 12px;">
           <button class="btn btn-secondary" @click="downloadBackup" style="width: 100%; justify-content: center;">
-            📥 Download Backup (panel.db)
+            <Download :size="16" aria-hidden="true" /> Download Backup (panel.db)
           </button>
 
           <div style="position: relative; border-top: 1px dashed var(--border-color); padding-top: 12px;">
@@ -103,7 +103,7 @@
               style="width: 100%; justify-content: center;"
             >
               <span v-if="restoring" class="spinner"></span>
-              <span v-else>📤</span>
+              <Upload v-else :size="16" aria-hidden="true" />
               {{ restoring ? 'Memulihkan Data...' : 'Pulihkan Database (Restore .db)' }}
             </button>
           </div>
@@ -113,13 +113,13 @@
       <!-- Change Password Card -->
       <div class="card" style="grid-column: 1 / -1;">
         <h4 style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
-          <span>🔐</span> Ubah Password Akun Admin
+          <KeyRound :size="18" class="card-title-icon" aria-hidden="true" /> Ubah Password Akun Admin
         </h4>
         <form @submit.prevent="handleChangePassword" style="max-width: 500px; display: flex; flex-direction: column; gap: 18px;">
           <div class="form-group" style="margin-bottom: 0;">
             <label class="form-label">Password Saat Ini</label>
             <div class="input-icon-wrapper">
-              <span class="input-icon">🔒</span>
+              <Lock :size="16" class="input-icon" aria-hidden="true" />
               <input
                 v-model="pwdForm.currentPassword"
                 type="password"
@@ -132,7 +132,7 @@
           <div class="form-group" style="margin-bottom: 0;">
             <label class="form-label">Password Baru</label>
             <div class="input-icon-wrapper">
-              <span class="input-icon">✨</span>
+              <KeyRound :size="16" class="input-icon" aria-hidden="true" />
               <input
                 v-model="pwdForm.newPassword"
                 type="password"
@@ -146,7 +146,7 @@
           <div class="form-group" style="margin-bottom: 0;">
             <label class="form-label">Konfirmasi Password Baru</label>
             <div class="input-icon-wrapper">
-              <span class="input-icon">🛡️</span>
+              <ShieldCheck :size="16" class="input-icon" aria-hidden="true" />
               <input
                 v-model="pwdForm.confirmPassword"
                 type="password"
@@ -159,18 +159,31 @@
           <div style="margin-top: 6px;">
             <button type="submit" class="btn btn-primary" :disabled="pwdLoading">
               <span v-if="pwdLoading" class="spinner"></span>
-              {{ pwdLoading ? 'Menyimpan...' : '💾 Perbarui Password' }}
+              {{ pwdLoading ? 'Menyimpan...' : 'Perbarui Password' }}
             </button>
           </div>
         </form>
       </div>
     </div>
+    <ConfirmDialog
+      v-if="pendingRestore"
+      title="Pulihkan Database"
+      :message="`Database panel saat ini akan ditimpa dengan isi '${pendingRestore.name}'. Salinan database lama disimpan otomatis sebagai panel.db.bak di server. Lanjutkan?`"
+      :icon="DatabaseBackup"
+      confirm-text="Ya, Pulihkan"
+      :danger-mode="true"
+      @confirm="confirmRestore"
+      @cancel="pendingRestore = null"
+    />
   </div>
 </template>
 
 <script setup>
+import { Server, Rocket, Zap, Package, HardDrive, Lock, Database, Download, Upload, KeyRound, ShieldCheck } from 'lucide-vue-next'
 import { ref, reactive, onMounted } from 'vue'
 import api from '../services/api.js'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
+import { DatabaseBackup } from 'lucide-vue-next'
 
 const system = ref({})
 const loading = ref(true)
@@ -178,6 +191,7 @@ const pwdLoading = ref(false)
 const restoring = ref(false)
 const optimizing = ref(false)
 const fileInput = ref(null)
+const pendingRestore = ref(null)
 
 const pwdForm = reactive({
   currentPassword: '',
@@ -243,10 +257,15 @@ async function handleRestoreFile(event) {
     return
   }
 
-  if (!confirm(`Apakah Anda yakin ingin memulihkan database dari '${file.name}'? Data saat ini akan ditimpa dengan data cadangan ini.`)) {
-    event.target.value = ''
-    return
-  }
+  // Konfirmasi lewat dialog panel; proses dilanjutkan di confirmRestore()
+  pendingRestore.value = file
+  event.target.value = ''
+}
+
+async function confirmRestore() {
+  const file = pendingRestore.value
+  pendingRestore.value = null
+  if (!file) return
 
   restoring.value = true
   try {
@@ -262,7 +281,6 @@ async function handleRestoreFile(event) {
     window.__toast?.(err.response?.data?.message || 'Gagal memulihkan database', 'error')
   } finally {
     restoring.value = false
-    event.target.value = ''
   }
 }
 
