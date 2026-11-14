@@ -3,21 +3,26 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const express = require('express');
-const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
 const { initDb, closeDb } = require('./db/database');
-const { authMiddleware } = require('./middleware/auth');
+const { authMiddleware: verifyToken, requirePasswordChanged } = require('./middleware/auth');
 const { validateProxyInput } = require('./middleware/validator');
 const proxyHandler = require('./handlers/proxy_handler');
 const authHandler = require('./handlers/auth_handler');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+// HOST=127.0.0.1 → panel hanya bisa diakses lewat Nginx (disarankan, set di .env)
+const HOST = process.env.HOST || '0.0.0.0';
 
-// Percayai proxy Nginx untuk mendeteksi header proto HTTPS
-app.set('trust proxy', 1);
+// Percayai header X-Forwarded-* hanya dari Nginx di jaringan lokal/privat.
+// Klien internet tidak bisa memalsukan IP (penting untuk rate limit login).
+app.set('trust proxy', process.env.TRUST_PROXY || 'loopback, linklocal, uniquelocal');
+
+// Semua route terproteksi: token valid + password default sudah diganti
+const authMiddleware = [verifyToken, requirePasswordChanged];
 
 // ─── Middleware Global ──────────────────────────────────────
 app.use(helmet({
@@ -28,24 +33,37 @@ app.use(helmet({
     preload: true
   }
 }));
-app.use(cors());
-app.use(express.json());
+// Tanpa CORS: frontend dilayani dari origin yang sama, jadi situs lain tidak
+// bisa memanggil API panel dari browser korban.
+app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Rate limiting
+// Rate limiting umum (cukup longgar untuk live monitoring WAF)
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 menit
-  max: 100, // Max 100 request per 15 menit
+  windowMs: 15 * 60 * 1000,
+  max: parseInt(process.env.API_RATE_LIMIT, 10) || 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: { success: false, message: 'Terlalu banyak request. Coba lagi nanti.' }
 });
 app.use('/api/', limiter);
+
+// Rate limiting khusus login (anti brute-force): hanya percobaan gagal yang dihitung
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: parseInt(process.env.LOGIN_RATE_LIMIT, 10) || 10,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Terlalu banyak percobaan login gagal. Coba lagi dalam 15 menit.' }
+});
 
 // ─── Static Files (Vue.js build) ────────────────────────────
 app.use(express.static(path.join(__dirname, '..', 'frontend', 'dist')));
 
 // ─── API Routes: Auth ───────────────────────────────────────
-app.post('/api/auth/login', authHandler.login);
-app.get('/api/auth/me', authMiddleware, authHandler.getCurrentUser);
+app.post('/api/auth/login', loginLimiter, authHandler.login);
+app.get('/api/auth/me', verifyToken, authHandler.getCurrentUser);
 
 // ─── API Routes: Proxy (Protected) ─────────────────────────
 app.get('/api/proxies', authMiddleware, proxyHandler.getAllProxies);
@@ -81,7 +99,8 @@ app.post('/api/waf/:id/mode', authMiddleware, wafHandler.setWafMode);
 // ─── API Routes: Settings & System ──────────────────────────
 const settingsHandler = require('./handlers/settings_handler');
 app.get('/api/settings/system', authMiddleware, settingsHandler.getSystemInfo);
-app.post('/api/settings/change-password', authMiddleware, settingsHandler.changePassword);
+// Ganti password tetap boleh walau password default belum diganti
+app.post('/api/settings/change-password', verifyToken, loginLimiter, settingsHandler.changePassword);
 app.get('/api/settings/backup-db', authMiddleware, settingsHandler.backupDatabase);
 app.post('/api/settings/restore-db', authMiddleware, express.raw({ type: '*/*', limit: '50mb' }), settingsHandler.restoreDatabase);
 app.post('/api/settings/optimize-all', authMiddleware, settingsHandler.optimizeAll);
@@ -138,13 +157,15 @@ async function startServer() {
     }
 
     // Start Express
-    app.listen(PORT, () => {
+    app.listen(PORT, HOST, () => {
       console.log('');
       console.log('╔══════════════════════════════════════════════╗');
       console.log('║   🖥️  Nginx Proxy Control Panel              ║');
-      console.log(`║   🌐 http://localhost:${PORT}                   ║`);
-      console.log('║   📋 Default: admin / admin123               ║');
+      console.log(`║   🌐 http://${HOST}:${PORT}`);
       console.log('╚══════════════════════════════════════════════╝');
+      if (HOST === '0.0.0.0') {
+        console.warn('⚠️  Panel terbuka di semua interface. Disarankan HOST=127.0.0.1 dan akses via Nginx + HTTPS.');
+      }
       console.log('');
     });
   } catch (err) {

@@ -1,7 +1,7 @@
 const WafLogParser = require('../services/waf_log_parser');
 const ProxyModel = require('../models/proxy');
 const configGen = require('../services/config_generator');
-const systemExec = require('../services/system_executor');
+const { configRejected } = require('./proxy_handler');
 
 /**
  * GET /api/waf/logs — Ambil log serangan WAF
@@ -56,7 +56,7 @@ async function getWafStats(req, res) {
 async function setWafMode(req, res) {
   try {
     const { id } = req.params;
-    const { waf_mode } = req.body;
+    const { waf_mode } = req.body || {};
 
     if (!['off', 'detection', 'on'].includes(waf_mode)) {
       return res.status(400).json({
@@ -75,12 +75,13 @@ async function setWafMode(req, res) {
 
     const updated = ProxyModel.update(id, { waf_mode });
 
-    // Regenerate konfigurasi Nginx dan reload
-    try {
-      configGen.generateConfig(updated);
-      await systemExec.reloadNginx();
-    } catch (configErr) {
-      console.error('WAF config reload warning:', configErr.message);
+    // Regenerate konfigurasi Nginx dan reload (rollback jika Nginx menolak)
+    const applied = await configGen.applyConfigChange([updated.domain_name], () => {
+      configGen.writeProxyConfig(updated);
+    });
+    if (!applied.success) {
+      ProxyModel.restore(proxy);
+      return configRejected(res, applied);
     }
 
     res.json({

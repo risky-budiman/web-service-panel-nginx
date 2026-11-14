@@ -2,13 +2,15 @@ const initSqlJs = require('sql.js');
 const path = require('path');
 const fs = require('fs');
 
-const DB_PATH = path.join(__dirname, '..', 'data', 'panel.db');
+const DB_PATH = process.env.PANEL_DB_PATH || path.join(__dirname, '..', 'data', 'panel.db');
 
 // Pastikan folder data ada
 const dataDir = path.dirname(DB_PATH);
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
+
+const DEFAULT_ADMIN_PASSWORD = 'admin123';
 
 let db = null;
 let SQL = null;
@@ -43,9 +45,47 @@ function reloadDbFromDisk() {
     const fileBuffer = fs.readFileSync(DB_PATH);
     if (db) db.close();
     db = new SQL.Database(fileBuffer);
+    initializeSchema();
+    saveDb();
     return true;
   }
   return false;
+}
+
+/**
+ * Validasi buffer file database sebelum dipakai untuk restore.
+ * Melempar Error dengan pesan yang jelas jika tidak valid.
+ */
+function validateDbBuffer(buffer) {
+  if (!SQL) throw new Error('Database belum diinisialisasi');
+  const MAGIC = Buffer.from('SQLite format 3' + String.fromCharCode(0), 'latin1');
+  if (!Buffer.isBuffer(buffer) || buffer.length < 512 || !buffer.subarray(0, 16).equals(MAGIC)) {
+    throw new Error('File bukan database SQLite yang valid');
+  }
+
+  let candidate;
+  try {
+    candidate = new SQL.Database(buffer);
+    const integrity = candidate.exec('PRAGMA integrity_check');
+    if (integrity[0]?.values?.[0]?.[0] !== 'ok') {
+      throw new Error('Database rusak (integrity_check gagal)');
+    }
+    const tables = (candidate.exec("SELECT name FROM sqlite_master WHERE type='table'")[0]?.values || []).map(r => r[0]);
+    for (const required of ['proxy_hosts', 'users']) {
+      if (!tables.includes(required)) throw new Error(`Tabel '${required}' tidak ditemukan di file backup`);
+    }
+    const cols = (candidate.exec('PRAGMA table_info(users)')[0]?.values || []).map(r => r[1]);
+    for (const required of ['username', 'password_hash']) {
+      if (!cols.includes(required)) throw new Error(`Kolom users.${required} tidak ditemukan di file backup`);
+    }
+    const userCount = candidate.exec('SELECT COUNT(*) FROM users')[0]?.values?.[0]?.[0] || 0;
+    if (userCount < 1) throw new Error('File backup tidak memiliki akun user');
+  } catch (err) {
+    if (err.message && !/^file is not a database/i.test(err.message)) throw err;
+    throw new Error('File bukan database SQLite yang valid');
+  } finally {
+    if (candidate) candidate.close();
+  }
 }
 
 /**
@@ -63,9 +103,12 @@ function getDb() {
  */
 function saveDb() {
   if (!db) return;
-  const data = db.export();
-  const buffer = Buffer.from(data);
-  fs.writeFileSync(DB_PATH, buffer);
+  const buffer = Buffer.from(db.export());
+  // Tulis atomik: file sementara lalu rename, agar panel.db tidak rusak
+  // jika proses mati di tengah penulisan.
+  const tmpPath = `${DB_PATH}.tmp-${process.pid}`;
+  fs.writeFileSync(tmpPath, buffer, { mode: 0o600 });
+  fs.renameSync(tmpPath, DB_PATH);
 }
 
 /**
@@ -134,17 +177,26 @@ function initializeSchema() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
+      must_change_password INTEGER NOT NULL DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
-  // Buat admin default jika belum ada
+  // Safe migration: kolom must_change_password untuk database lama
+  const userCols = queryAll('PRAGMA table_info(users)');
+  if (!userCols.some(col => col.name === 'must_change_password')) {
+    db.run('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0');
+    console.log("🔐 Migrasi database: kolom 'must_change_password' ditambahkan.");
+  }
+
+  // Buat admin default jika belum ada user sama sekali.
+  // Password default WAJIB diganti saat login pertama.
   const bcrypt = require('bcryptjs');
-  const existingAdmin = queryOne('SELECT id FROM users WHERE username = ?', ['admin']);
-  if (!existingAdmin) {
-    const hash = bcrypt.hashSync('admin123', 10);
-    db.run('INSERT INTO users (username, password_hash) VALUES (?, ?)', ['admin', hash]);
-    console.log('✅ Default admin created (username: admin, password: admin123)');
+  const anyUser = queryOne('SELECT id FROM users LIMIT 1');
+  if (!anyUser) {
+    const hash = bcrypt.hashSync(DEFAULT_ADMIN_PASSWORD, 12);
+    db.run('INSERT INTO users (username, password_hash, must_change_password) VALUES (?, ?, 1)', ['admin', hash]);
+    console.log(`✅ Default admin dibuat (username: admin, password: ${DEFAULT_ADMIN_PASSWORD}) — wajib diganti saat login pertama`);
   }
 }
 
@@ -159,4 +211,7 @@ function closeDb() {
   }
 }
 
-module.exports = { initDb, getDb, saveDb, closeDb, runAndSave, queryAll, queryOne, reloadDbFromDisk, DB_PATH };
+module.exports = {
+  initDb, getDb, saveDb, closeDb, runAndSave, queryAll, queryOne,
+  reloadDbFromDisk, validateDbBuffer, DB_PATH, DEFAULT_ADMIN_PASSWORD
+};

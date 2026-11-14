@@ -3,18 +3,46 @@ const configGen = require('../services/config_generator');
 const systemExec = require('../services/system_executor');
 
 /**
+ * Respons standar ketika Nginx menolak konfigurasi baru.
+ * Perubahan database sudah dibatalkan oleh pemanggil.
+ */
+function configRejected(res, applyResult) {
+  return res.status(422).json({
+    success: false,
+    message: applyResult.message || 'Nginx menolak konfigurasi. Perubahan dibatalkan.',
+    nginx_output: applyResult.output || undefined
+  });
+}
+
+/**
+ * Terbitkan sertifikat Let's Encrypt otomatis bila SSL diminta dan belum ada.
+ * Config HTTP sementara dipasang agar challenge Certbot bisa diverifikasi.
+ * Mengembalikan pesan peringatan (string) bila gagal, atau null.
+ */
+async function ensureCertificate(proxy) {
+  if (!proxy.ssl_enabled || process.platform !== 'linux') return null;
+  if (systemExec.hasCertificate(proxy.domain_name)) return null;
+
+  console.log(`🔐 Mengambil sertifikat SSL otomatis untuk ${proxy.domain_name}...`);
+  const tmp = await configGen.applyConfigChange([proxy.domain_name], () => {
+    configGen.generateConfig({ ...proxy, ssl_enabled: 0 });
+  });
+  if (!tmp.success) return `Config HTTP sementara ditolak Nginx: ${tmp.message}`;
+
+  const certResult = await systemExec.obtainCertificate(proxy.domain_name);
+  if (!certResult.success) {
+    console.warn(`⚠️ Certbot gagal untuk ${proxy.domain_name}: ${certResult.message}`);
+    return 'Sertifikat SSL gagal diterbitkan, domain sementara berjalan di HTTP';
+  }
+  return null;
+}
+
+/**
  * GET /api/proxies — List semua proxy
  */
 function getAllProxies(req, res) {
   try {
-    const proxies = ProxyModel.getAll();
-    const stats = ProxyModel.getStats();
-
-    res.json({
-      success: true,
-      data: proxies,
-      stats
-    });
+    res.json({ success: true, data: ProxyModel.getAll(), stats: ProxyModel.getStats() });
   } catch (err) {
     console.error('Error getting proxies:', err);
     res.status(500).json({ success: false, message: 'Gagal mengambil data proxy' });
@@ -44,58 +72,29 @@ async function createProxy(req, res) {
   try {
     const { domain_name, target_ip, target_port, ssl_enabled, waf_mode } = req.body;
 
-    // Cek duplikat domain
-    const existing = ProxyModel.getByDomain(domain_name);
-    if (existing) {
-      return res.status(409).json({
-        success: false,
-        message: `Domain '${domain_name}' sudah terdaftar`
-      });
+    if (ProxyModel.getByDomain(domain_name)) {
+      return res.status(409).json({ success: false, message: `Domain '${domain_name}' sudah terdaftar` });
     }
 
-    let proxy = ProxyModel.create({ domain_name, target_ip, target_port, ssl_enabled, waf_mode });
+    const proxy = ProxyModel.create({ domain_name, target_ip, target_port, ssl_enabled, waf_mode });
+    const sslWarning = await ensureCertificate(proxy);
 
-    // Jika SSL diaktifkan, otomatis terbitkan sertifikat via Certbot jika belum ada
-    if (proxy.ssl_enabled && process.platform === 'linux') {
-      try {
-        if (!systemExec.hasCertificate(proxy.domain_name)) {
-          console.log(`🔐 Mengambil sertifikat SSL otomatis untuk ${proxy.domain_name}...`);
-          // Generate config HTTP sementara agar verifikasi challenge Certbot berhasil
-          configGen.generateConfig({ ...proxy, ssl_enabled: 0 });
-          await systemExec.reloadNginx();
-
-          const certResult = await systemExec.obtainCertificate(proxy.domain_name);
-          if (!certResult.success) {
-            console.warn(`⚠️ Certbot gagal untuk ${proxy.domain_name}: ${certResult.message}`);
-          }
-        }
-      } catch (sslErr) {
-        console.error('Auto SSL warning:', sslErr.message);
-      }
-    }
-
-    // Generate nginx config definitif
-    try {
+    const applied = await configGen.applyConfigChange([proxy.domain_name], () => {
       configGen.generateConfig(proxy);
-      const result = await systemExec.reloadNginx();
-      if (!result.success && !result.skipped) {
-        ProxyModel.setError(proxy.id);
-      }
-    } catch (configErr) {
-      console.error('Config generation warning:', configErr.message);
+    });
+    if (!applied.success) {
+      ProxyModel.delete(proxy.id);
+      return configRejected(res, applied);
     }
 
     res.status(201).json({
       success: true,
-      message: 'Proxy berhasil ditambahkan' + (proxy.ssl_enabled ? ' dan SSL otomatis diaktifkan' : ''),
+      message: 'Proxy berhasil ditambahkan' + (sslWarning ? ` (${sslWarning})` : proxy.ssl_enabled ? ' dan SSL otomatis diaktifkan' : ''),
       data: proxy
     });
   } catch (err) {
     console.error('Error creating proxy:', err);
-    res.status(500).json({
-      success: false,
-      message: 'Gagal memproses proxy: ' + (err.message || 'Terjadi kesalahan sistem')
-    });
+    res.status(500).json({ success: false, message: 'Gagal memproses proxy' });
   }
 }
 
@@ -110,52 +109,27 @@ async function updateProxy(req, res) {
     }
 
     const { domain_name, target_ip, target_port, ssl_enabled, waf_mode } = req.body;
+    const domainChanged = domain_name && domain_name !== existing.domain_name;
 
-    // Cek duplikat domain (jika domain berubah)
-    if (domain_name && domain_name !== existing.domain_name) {
-      const duplicate = ProxyModel.getByDomain(domain_name);
-      if (duplicate) {
-        return res.status(409).json({
-          success: false,
-          message: `Domain '${domain_name}' sudah digunakan oleh proxy lain`
-        });
-      }
-      // Hapus config lama jika domain berubah
-      configGen.removeConfig(existing.domain_name);
+    if (domainChanged && ProxyModel.getByDomain(domain_name)) {
+      return res.status(409).json({ success: false, message: `Domain '${domain_name}' sudah digunakan oleh proxy lain` });
     }
 
-    let proxy = ProxyModel.update(req.params.id, { domain_name, target_ip, target_port, ssl_enabled, waf_mode });
+    const proxy = ProxyModel.update(req.params.id, { domain_name, target_ip, target_port, ssl_enabled, waf_mode });
+    const sslWarning = await ensureCertificate(proxy);
 
-    // Jika SSL diaktifkan, otomatis terbitkan sertifikat via Certbot jika belum ada
-    if (proxy.ssl_enabled && process.platform === 'linux') {
-      try {
-        if (!systemExec.hasCertificate(proxy.domain_name)) {
-          console.log(`🔐 Mengambil sertifikat SSL otomatis untuk ${proxy.domain_name}...`);
-          // Generate config HTTP sementara agar verifikasi challenge Certbot berhasil
-          configGen.generateConfig({ ...proxy, ssl_enabled: 0 });
-          await systemExec.reloadNginx();
-
-          const certResult = await systemExec.obtainCertificate(proxy.domain_name);
-          if (!certResult.success) {
-            console.warn(`⚠️ Certbot gagal untuk ${proxy.domain_name}: ${certResult.message}`);
-          }
-        }
-      } catch (sslErr) {
-        console.error('Auto SSL warning:', sslErr.message);
-      }
-    }
-
-    // Re-generate nginx config definitif
-    try {
-      configGen.generateConfig(proxy);
-      await systemExec.reloadNginx();
-    } catch (configErr) {
-      console.error('Config generation warning:', configErr.message);
+    const applied = await configGen.applyConfigChange([existing.domain_name, proxy.domain_name], () => {
+      if (domainChanged) configGen.removeConfig(existing.domain_name);
+      configGen.writeProxyConfig(proxy);
+    });
+    if (!applied.success) {
+      ProxyModel.restore(existing);
+      return configRejected(res, applied);
     }
 
     res.json({
       success: true,
-      message: 'Proxy berhasil diperbarui' + (proxy.ssl_enabled ? ' dan SSL otomatis diaktifkan' : ''),
+      message: 'Proxy berhasil diperbarui' + (sslWarning ? ` (${sslWarning})` : proxy.ssl_enabled ? ' dan SSL otomatis diaktifkan' : ''),
       data: proxy
     });
   } catch (err) {
@@ -169,24 +143,21 @@ async function updateProxy(req, res) {
  */
 async function deleteProxy(req, res) {
   try {
-    const proxy = ProxyModel.delete(req.params.id);
+    const proxy = ProxyModel.getById(req.params.id);
     if (!proxy) {
       return res.status(404).json({ success: false, message: 'Proxy tidak ditemukan' });
     }
 
-    // Hapus nginx config file
-    try {
+    const applied = await configGen.applyConfigChange([proxy.domain_name], () => {
       configGen.removeConfig(proxy.domain_name);
-      await systemExec.reloadNginx();
-    } catch (configErr) {
-      console.error('Config removal warning:', configErr.message);
+    });
+    if (!applied.success) {
+      return configRejected(res, applied);
     }
 
-    res.json({
-      success: true,
-      message: `Proxy '${proxy.domain_name}' berhasil dihapus`,
-      data: proxy
-    });
+    ProxyModel.delete(proxy.id);
+
+    res.json({ success: true, message: `Proxy '${proxy.domain_name}' berhasil dihapus`, data: proxy });
   } catch (err) {
     console.error('Error deleting proxy:', err);
     res.status(500).json({ success: false, message: 'Gagal menghapus proxy' });
@@ -194,7 +165,7 @@ async function deleteProxy(req, res) {
 }
 
 /**
- * PATCH /api/proxies/:id/toggle — Toggle aktif/nonaktif
+ * PATCH|POST /api/proxies/:id/toggle — Toggle aktif/nonaktif
  */
 async function toggleProxy(req, res) {
   try {
@@ -205,26 +176,20 @@ async function toggleProxy(req, res) {
 
     const proxy = ProxyModel.toggleStatus(req.params.id);
 
-    // Enable/disable nginx config
-    try {
+    const applied = await configGen.applyConfigChange([proxy.domain_name], () => {
       if (proxy.status === 'inactive') {
         configGen.disableConfig(proxy.domain_name);
       } else {
         configGen.enableConfig(proxy.domain_name);
-        if (!configGen.configExists(proxy.domain_name)) {
-          configGen.generateConfig(proxy);
-        }
+        configGen.generateConfig(proxy);
       }
-      await systemExec.reloadNginx();
-    } catch (configErr) {
-      console.error('Config toggle warning:', configErr.message);
+    });
+    if (!applied.success) {
+      ProxyModel.restore(before);
+      return configRejected(res, applied);
     }
 
-    res.json({
-      success: true,
-      message: `Proxy '${proxy.domain_name}' sekarang ${proxy.status}`,
-      data: proxy
-    });
+    res.json({ success: true, message: `Proxy '${proxy.domain_name}' sekarang ${proxy.status}`, data: proxy });
   } catch (err) {
     console.error('Error toggling proxy:', err);
     res.status(500).json({ success: false, message: 'Gagal mengubah status proxy' });
@@ -236,8 +201,7 @@ async function toggleProxy(req, res) {
  */
 function getStats(req, res) {
   try {
-    const stats = ProxyModel.getStats();
-    res.json({ success: true, data: stats });
+    res.json({ success: true, data: ProxyModel.getStats() });
   } catch (err) {
     console.error('Error getting stats:', err);
     res.status(500).json({ success: false, message: 'Gagal mengambil statistik' });
@@ -251,5 +215,6 @@ module.exports = {
   updateProxy,
   deleteProxy,
   toggleProxy,
-  getStats
+  getStats,
+  configRejected
 };

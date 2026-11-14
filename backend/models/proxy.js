@@ -4,9 +4,6 @@ class ProxyModel {
   /**
    * Ambil semua proxy hosts
    */
-  /**
-   * Ambil semua proxy hosts
-   */
   static getAll() {
     return queryAll(`
       SELECT id, domain_name, target_ip, target_port, ssl_enabled, waf_mode, status, created_at, updated_at
@@ -89,6 +86,17 @@ class ProxyModel {
   static setError(id) {
     runAndSave("UPDATE proxy_hosts SET status = 'error', updated_at = CURRENT_TIMESTAMP WHERE id = ?", [id]);
     return this.getById(id);
+  }
+
+  /**
+   * Kembalikan baris proxy persis seperti snapshot sebelumnya (rollback)
+   */
+  static restore(row) {
+    runAndSave(
+      `UPDATE proxy_hosts SET domain_name = ?, target_ip = ?, target_port = ?, ssl_enabled = ?, waf_mode = ?, status = ?, updated_at = ? WHERE id = ?`,
+      [row.domain_name, row.target_ip, row.target_port, row.ssl_enabled, row.waf_mode, row.status, row.updated_at, row.id]
+    );
+    return this.getById(row.id);
   }
 
   /**

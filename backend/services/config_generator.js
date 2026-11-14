@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { isValidDomain, isPrivateIPv4, isValidPort, VALID_WAF_MODES } = require('../middleware/validator');
 
 // Path untuk menyimpan konfigurasi Nginx yang di-generate
 // Pada server Linux: default selalu /etc/nginx/panel-conf.d
@@ -9,6 +10,32 @@ const NGINX_CONF_DIR = process.env.NGINX_CONF_DIR || (process.platform === 'linu
 // Pastikan folder ada
 if (!fs.existsSync(NGINX_CONF_DIR)) {
   fs.mkdirSync(NGINX_CONF_DIR, { recursive: true });
+}
+
+/**
+ * Pertahanan berlapis: tolak menulis config jika data proxy tidak valid
+ * (mis. baris lama di database yang dibuat sebelum validasi diperketat).
+ */
+function assertSafeProxy(proxy) {
+  if (!proxy || !isValidDomain(proxy.domain_name)) {
+    throw new Error(`Domain tidak valid untuk config Nginx: ${proxy && proxy.domain_name}`);
+  }
+  const ip = proxy.target_ip === 'localhost' ? '127.0.0.1' : proxy.target_ip;
+  if (!isPrivateIPv4(ip)) {
+    throw new Error(`Target IP tidak valid untuk config Nginx: ${proxy.target_ip}`);
+  }
+  if (!isValidPort(Number(proxy.target_port))) {
+    throw new Error(`Port tidak valid untuk config Nginx: ${proxy.target_port}`);
+  }
+  if (proxy.waf_mode && !VALID_WAF_MODES.includes(proxy.waf_mode)) {
+    throw new Error(`Mode WAF tidak valid: ${proxy.waf_mode}`);
+  }
+}
+
+function assertSafeDomain(domainName) {
+  if (!isValidDomain(domainName)) {
+    throw new Error(`Domain tidak valid: ${domainName}`);
+  }
 }
 
 /**
@@ -121,6 +148,9 @@ ${modSecBlock}
         proxy_cache_lock on;
         proxy_cache_lock_timeout 5s;
         proxy_cache_revalidate on;
+        # Jangan simpan / sajikan cache untuk request yang membawa kredensial
+        proxy_no_cache $http_authorization;
+        proxy_cache_bypass $http_authorization;
 
         # Browser Cache 30 hari (Instan dari disk cache laptop)
         expires 30d;
@@ -155,7 +185,7 @@ ${modSecBlock}
     }
 
     # Khusus OAuth2 Callback & Webhooks (Bypass WAF false-positives & buffering)
-    location ~* ^/(rest/oauth2-credential/callback|webhook|webhook-test) {
+    location ~* ^/(rest/oauth2-credential/callback|webhook|webhook-test)(/|$) {
         proxy_pass http://${upstreamName};
         proxy_http_version 1.1;
 
@@ -257,6 +287,9 @@ ${modSecBlock}
         proxy_cache_lock on;
         proxy_cache_lock_timeout 5s;
         proxy_cache_revalidate on;
+        # Jangan simpan / sajikan cache untuk request yang membawa kredensial
+        proxy_no_cache $http_authorization;
+        proxy_cache_bypass $http_authorization;
 
         # Browser Cache 30 hari (Instan dari disk cache laptop)
         expires 30d;
@@ -292,12 +325,15 @@ ${modSecBlock}
 
         # Redirect rewrite agar tidak looping atau kembali ke http
         proxy_redirect http:// https://;
-        proxy_cookie_path / "/; Secure; SameSite=None";
+        proxy_cookie_path ~^(.*)$ "$1; Secure";
 
         # Header Browser CSP: otomatis ubah semua link aset internal http:// menjadi https://
         add_header Content-Security-Policy "upgrade-insecure-requests" always;
 
         # Mixed-content rewrite ringan khusus HTML (tidak membebani JSON / API / JS)
+        # sub_filter tidak bisa membaca respons gzip dari backend → minta respons tanpa kompresi
+        # (Nginx tetap mengompres ulang ke browser via gzip global).
+        proxy_set_header Accept-Encoding "";
         sub_filter 'http://${proxy.domain_name}' 'https://${proxy.domain_name}';
         sub_filter_once off;
 
@@ -308,7 +344,7 @@ ${modSecBlock}
     }
 
     # Khusus OAuth2 Callback & Webhooks (Bypass WAF false-positives & buffering)
-    location ~* ^/(rest/oauth2-credential/callback|webhook|webhook-test) {
+    location ~* ^/(rest/oauth2-credential/callback|webhook|webhook-test)(/|$) {
         proxy_pass http://${upstreamName};
         proxy_http_version 1.1;
 
@@ -349,6 +385,7 @@ ${modSecBlock}
  * Generate dan tulis file konfigurasi Nginx
  */
 function generateConfig(proxy) {
+  assertSafeProxy(proxy);
   let useSsl = Boolean(proxy.ssl_enabled);
 
   // Jika di Linux, pastikan sertifikat Let's Encrypt benar-benar ada di disk
@@ -386,24 +423,38 @@ function generateConfig(proxy) {
 }
 
 /**
+ * Tulis config sesuai status proxy: aktif → .conf, nonaktif → .conf.disabled
+ */
+function writeProxyConfig(proxy) {
+  const result = generateConfig(proxy);
+  if (proxy.status === 'inactive') disableConfig(proxy.domain_name);
+  return result;
+}
+
+/**
  * Hapus file konfigurasi Nginx
  */
 function removeConfig(domainName) {
-  const filename = `${domainName}.conf`;
-  const filepath = path.join(NGINX_CONF_DIR, filename);
+  assertSafeDomain(domainName);
+  const filepath = path.join(NGINX_CONF_DIR, `${domainName}.conf`);
+  let removed = false;
 
-  if (fs.existsSync(filepath)) {
-    fs.unlinkSync(filepath);
-    console.log(`🗑️  Config removed: ${filepath}`);
-    return true;
+  // Hapus config aktif maupun versi .disabled
+  for (const file of [filepath, `${filepath}.disabled`]) {
+    if (fs.existsSync(file)) {
+      fs.unlinkSync(file);
+      console.log(`🗑️  Config removed: ${file}`);
+      removed = true;
+    }
   }
-  return false;
+  return removed;
 }
 
 /**
  * Nonaktifkan config (rename dengan suffix .disabled)
  */
 function disableConfig(domainName) {
+  assertSafeDomain(domainName);
   const filename = `${domainName}.conf`;
   const filepath = path.join(NGINX_CONF_DIR, filename);
   const disabledPath = filepath + '.disabled';
@@ -420,6 +471,7 @@ function disableConfig(domainName) {
  * Aktifkan kembali config (hapus suffix .disabled)
  */
 function enableConfig(domainName) {
+  assertSafeDomain(domainName);
   const filename = `${domainName}.conf`;
   const filepath = path.join(NGINX_CONF_DIR, filename);
   const disabledPath = filepath + '.disabled';
@@ -438,6 +490,66 @@ function enableConfig(domainName) {
 function configExists(domainName) {
   const filepath = path.join(NGINX_CONF_DIR, `${domainName}.conf`);
   return fs.existsSync(filepath);
+}
+
+/**
+ * Jalankan perubahan file config secara transaksional:
+ *   1. snapshot file .conf / .conf.disabled milik domain terkait
+ *   2. jalankan mutate() (generate / disable / remove)
+ *   3. nginx -t + reload
+ *   4. jika gagal → kembalikan semua file seperti semula
+ *
+ * Dengan begitu satu config yang salah tidak pernah tertinggal di disk dan
+ * tidak memblokir reload domain lain.
+ *
+ * @returns {Promise<{success: boolean, skipped?: boolean, message: string, output?: string}>}
+ */
+async function applyConfigChange(domains, mutate) {
+  const systemExec = require('./system_executor');
+  const files = [];
+  for (const domain of new Set(domains.filter(Boolean))) {
+    assertSafeDomain(domain);
+    const base = path.join(NGINX_CONF_DIR, `${domain}.conf`);
+    files.push(base, `${base}.disabled`);
+  }
+
+  const snapshot = files.map(file => ({
+    file,
+    content: fs.existsSync(file) ? fs.readFileSync(file) : null
+  }));
+
+  const restore = () => {
+    for (const { file, content } of snapshot) {
+      try {
+        if (content === null) {
+          if (fs.existsSync(file)) fs.unlinkSync(file);
+        } else {
+          fs.writeFileSync(file, content);
+        }
+      } catch (restoreErr) {
+        console.error(`Gagal mengembalikan ${file}:`, restoreErr.message);
+      }
+    }
+  };
+
+  try {
+    mutate();
+  } catch (err) {
+    restore();
+    return { success: false, message: 'Gagal menulis konfigurasi Nginx: ' + err.message };
+  }
+
+  const result = await systemExec.reloadNginx();
+  if (result.success) return result;
+
+  restore();
+  const output = result.testResult?.output || result.testResult?.error || result.error || '';
+  console.error('❌ Nginx menolak konfigurasi, file dikembalikan:', output);
+  return {
+    success: false,
+    message: (result.message || 'Nginx menolak konfigurasi') + '. Perubahan dibatalkan.',
+    output
+  };
 }
 
 /**
@@ -582,12 +694,19 @@ async function regenerateAllConfigs() {
   // 2. Tulis ulang semua konfigurasi proxy aktif
   const proxies = ProxyModel.getAll();
   let count = 0;
+  const skipped = [];
   for (const proxy of proxies) {
-    if (proxy.status === 'active') {
-      generateConfig(proxy);
-      count++;
-    } else {
-      disableConfig(proxy.domain_name);
+    try {
+      if (proxy.status === 'active') {
+        generateConfig(proxy);
+        count++;
+      } else {
+        disableConfig(proxy.domain_name);
+      }
+    } catch (err) {
+      // Data tidak valid tidak boleh menghentikan regenerasi domain lain
+      console.error(`⚠️  Lewati ${proxy.domain_name}: ${err.message}`);
+      skipped.push({ id: proxy.id, domain_name: proxy.domain_name, error: err.message });
     }
   }
 
@@ -595,16 +714,19 @@ async function regenerateAllConfigs() {
 
   // 3. Reload Nginx jika di server Linux
   const reloadResult = await systemExec.reloadNginx();
-  return { success: true, count, reloadResult };
+  return { success: reloadResult.success, count, skipped, reloadResult };
 }
 
 module.exports = {
   generateConfig,
+  writeProxyConfig,
   generateDefaultCatchAll,
   generateOptimizationGlobals,
   regenerateAllConfigs,
   removeConfig,
   disableConfig,
+  applyConfigChange,
+  assertSafeProxy,
   enableConfig,
   configExists,
   NGINX_CONF_DIR

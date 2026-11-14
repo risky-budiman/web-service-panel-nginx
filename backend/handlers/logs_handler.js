@@ -1,5 +1,38 @@
 const fs = require('fs');
 const path = require('path');
+const ProxyModel = require('../models/proxy');
+const { isValidDomain } = require('../middleware/validator');
+
+// Hanya baca bagian akhir file log (hindari memuat file ratusan MB ke memori)
+const TAIL_BYTES = 2 * 1024 * 1024;
+
+function readTailLines(filePath, maxLines) {
+  const { size } = fs.statSync(filePath);
+  const start = Math.max(0, size - TAIL_BYTES);
+  const length = size - start;
+  const buffer = Buffer.alloc(length);
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    fs.readSync(fd, buffer, 0, length, start);
+  } finally {
+    fs.closeSync(fd);
+  }
+  let lines = buffer.toString('utf8').split('\n');
+  if (start > 0) lines = lines.slice(1); // baris pertama kemungkinan terpotong
+  return lines.filter(line => line.trim().length > 0).slice(-maxLines).reverse();
+}
+
+/**
+ * Resolve path log untuk domain. Domain harus terdaftar di panel, sehingga
+ * parameter tidak bisa dipakai untuk membaca / mengosongkan file lain.
+ * Mengembalikan null bila domain tidak valid.
+ */
+function resolveLogPath(domain) {
+  if (!domain) return path.join(LOG_DIR, 'access.log');
+  const clean = String(domain).trim().toLowerCase();
+  if (!isValidDomain(clean) || !ProxyModel.getByDomain(clean)) return null;
+  return path.join(LOG_DIR, `${clean}.access.log`);
+}
 
 // Direktori log Nginx
 // Di Linux: /var/log/nginx/
@@ -16,41 +49,14 @@ if (!fs.existsSync(LOG_DIR)) {
 function getLogs(req, res) {
   try {
     const { domain, limit = 100 } = req.query;
-    const maxLines = Math.min(parseInt(limit) || 100, 500);
+    const maxLines = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 500);
 
-    let logFilePath = '';
-
-    if (domain) {
-      logFilePath = path.join(LOG_DIR, `${domain}.access.log`);
-    } else {
-      // General access.log
-      logFilePath = path.join(LOG_DIR, 'access.log');
+    const logFilePath = resolveLogPath(domain);
+    if (!logFilePath) {
+      return res.status(400).json({ success: false, message: 'Domain tidak terdaftar di panel' });
     }
 
-    let rawLines = [];
-
-    if (fs.existsSync(logFilePath)) {
-      const content = fs.readFileSync(logFilePath, 'utf8');
-      rawLines = content.split('\n').filter(line => line.trim().length > 0);
-      rawLines = rawLines.slice(-maxLines).reverse();
-    } else {
-      // Coba cari semua log yang ada di folder LOG_DIR
-      const files = fs.readdirSync(LOG_DIR).filter(f => f.endsWith('.log'));
-      if (files.length > 0) {
-        const firstFile = path.join(LOG_DIR, files[0]);
-        const content = fs.readFileSync(firstFile, 'utf8');
-        rawLines = content.split('\n').filter(line => line.trim().length > 0).slice(-maxLines).reverse();
-      } else {
-        // Mock sample logs untuk environment non-linux / belum ada traffic
-        const now = new Date();
-        rawLines = [
-          `127.0.0.1 - - [${now.toUTCString()}] "GET /api/stats HTTP/1.1" 200 412 "-" "Mozilla/5.0"`,
-          `127.0.0.1 - - [${now.toUTCString()}] "GET /api/proxies HTTP/1.1" 200 1204 "-" "Mozilla/5.0"`,
-          `192.168.1.105 - - [${now.toUTCString()}] "GET / HTTP/1.1" 200 5231 "-" "Chrome/124.0"`,
-          `192.168.1.200 - - [${now.toUTCString()}] "POST /api/auth/login HTTP/1.1" 200 185 "-" "NginxPanel/1.0"`
-        ];
-      }
-    }
+    const rawLines = fs.existsSync(logFilePath) ? readTailLines(logFilePath, maxLines) : [];
 
     // Parse baris log standar Nginx
     const parsedLogs = rawLines.map((line, idx) => {
@@ -85,6 +91,7 @@ function getLogs(req, res) {
       success: true,
       data: parsedLogs,
       log_file: logFilePath,
+      available: fs.existsSync(logFilePath),
       total: parsedLogs.length
     });
   } catch (err) {
@@ -98,8 +105,11 @@ function getLogs(req, res) {
  */
 function clearLogs(req, res) {
   try {
-    const { domain } = req.body;
-    let logFilePath = domain ? path.join(LOG_DIR, `${domain}.access.log`) : path.join(LOG_DIR, 'access.log');
+    const { domain } = req.body || {};
+    const logFilePath = resolveLogPath(domain);
+    if (!logFilePath) {
+      return res.status(400).json({ success: false, message: 'Domain tidak terdaftar di panel' });
+    }
 
     if (fs.existsSync(logFilePath)) {
       fs.writeFileSync(logFilePath, '');

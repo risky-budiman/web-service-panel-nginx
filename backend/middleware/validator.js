@@ -1,57 +1,91 @@
 /**
- * Middleware untuk validasi input proxy
+ * Validasi input proxy.
+ *
+ * Nilai-nilai ini ditulis langsung ke file konfigurasi Nginx, jadi validasinya
+ * harus ketat (whitelist) agar tidak ada karakter seperti ; { } spasi atau
+ * baris baru yang bisa menyisipkan direktif Nginx.
  */
+const net = require('net');
 
-// Regex pattern untuk validasi
-const DOMAIN_REGEX = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
-const PRIVATE_IP_REGEX = /^(10\.\d{1,3}\.\d{1,3}\.\d{1,3})|(172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})|(192\.168\.\d{1,3}\.\d{1,3})|(127\.\d{1,3}\.\d{1,3}\.\d{1,3})$/;
+const DOMAIN_REGEX = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+const VALID_WAF_MODES = ['off', 'detection', 'on'];
+
+function isValidDomain(value) {
+  return typeof value === 'string' && DOMAIN_REGEX.test(value);
+}
+
+/**
+ * IPv4 privat / loopback: 10/8, 172.16/12, 192.168/16, 127/8.
+ * Menggunakan net.isIPv4 sehingga hanya alamat IPv4 utuh yang diterima.
+ */
+function isPrivateIPv4(value) {
+  if (typeof value !== 'string' || !net.isIPv4(value)) return false;
+  const [a, b] = value.split('.').map(Number);
+  return (
+    a === 10 ||
+    a === 127 ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168)
+  );
+}
+
+function isValidPort(value) {
+  return Number.isInteger(value) && value >= 1 && value <= 65535;
+}
+
+function parsePort(value) {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string' && /^\d{1,5}$/.test(value.trim())) return Number(value.trim());
+  return NaN;
+}
 
 function validateProxyInput(req, res, next) {
-  const { domain_name, target_ip, target_port } = req.body;
+  const body = req.body || {};
   const errors = [];
 
-  // Validasi domain
-  if (!domain_name || typeof domain_name !== 'string') {
+  const domain = typeof body.domain_name === 'string' ? body.domain_name.trim().toLowerCase() : '';
+  let targetIp = typeof body.target_ip === 'string' ? body.target_ip.trim() : '';
+  if (targetIp.toLowerCase() === 'localhost') targetIp = '127.0.0.1';
+  const port = parsePort(body.target_port);
+
+  if (!domain) {
     errors.push('Domain name wajib diisi');
-  } else if (!DOMAIN_REGEX.test(domain_name.trim())) {
+  } else if (!isValidDomain(domain)) {
     errors.push('Format domain tidak valid (contoh: app.example.com)');
   }
 
-  // Validasi IP
-  if (!target_ip || typeof target_ip !== 'string') {
+  if (!targetIp) {
     errors.push('Target IP wajib diisi');
-  } else if (!PRIVATE_IP_REGEX.test(target_ip.trim())) {
-    errors.push('Target IP harus berupa IP privat (10.x.x.x, 172.16-31.x.x, 192.168.x.x, atau 127.x.x.x)');
+  } else if (!isPrivateIPv4(targetIp)) {
+    errors.push('Target IP harus berupa IPv4 privat (10.x.x.x, 172.16-31.x.x, 192.168.x.x, atau 127.x.x.x)');
   }
 
-  // Validasi Port
-  if (target_port === undefined || target_port === null || target_port === '') {
+  if (body.target_port === undefined || body.target_port === null || body.target_port === '') {
     errors.push('Target port wajib diisi');
-  } else {
-    const port = parseInt(target_port, 10);
-    if (isNaN(port) || port < 1 || port > 65535) {
-      errors.push('Port harus berupa angka antara 1-65535');
-    }
+  } else if (!isValidPort(port)) {
+    errors.push('Port harus berupa angka antara 1-65535');
+  }
+
+  if (body.waf_mode !== undefined && !VALID_WAF_MODES.includes(body.waf_mode)) {
+    errors.push("Mode WAF tidak valid. Gunakan 'off', 'detection', atau 'on'.");
   }
 
   if (errors.length > 0) {
-    return res.status(400).json({
-      success: false,
-      message: 'Validasi gagal',
-      errors
-    });
+    return res.status(400).json({ success: false, message: 'Validasi gagal', errors });
   }
 
-  // Sanitize input
-  req.body.domain_name = domain_name.trim().toLowerCase();
-  req.body.target_ip = target_ip.trim();
-  req.body.target_port = parseInt(target_port, 10);
-  if (req.body.waf_mode !== undefined) {
-    const validModes = ['off', 'detection', 'on'];
-    req.body.waf_mode = validModes.includes(req.body.waf_mode) ? req.body.waf_mode : 'off';
-  }
+  req.body.domain_name = domain;
+  req.body.target_ip = targetIp;
+  req.body.target_port = port;
+  if (body.ssl_enabled !== undefined) req.body.ssl_enabled = Boolean(body.ssl_enabled);
 
   next();
 }
 
-module.exports = { validateProxyInput };
+module.exports = {
+  validateProxyInput,
+  isValidDomain,
+  isPrivateIPv4,
+  isValidPort,
+  VALID_WAF_MODES
+};

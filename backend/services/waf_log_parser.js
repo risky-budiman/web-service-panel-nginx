@@ -3,6 +3,7 @@ const readline = require('readline');
 const path = require('path');
 
 const AUDIT_LOG_PATH = process.env.MODSEC_AUDIT_LOG || '/var/log/modsec_audit.log';
+const WAF_TAIL_BYTES = (parseInt(process.env.WAF_TAIL_MB, 10) || 20) * 1024 * 1024;
 
 /**
  * Service untuk membaca dan mem-parse log ModSecurity
@@ -152,7 +153,11 @@ class WafLogParser {
    * Parser internal untuk format section native ModSecurity
    */
   static async parseAuditLog(filePath, maxEntries = 200) {
-    const fileStream = fs.createReadStream(filePath, { encoding: 'utf8' });
+    // Hanya baca bagian akhir file. Entri pertama yang terpotong otomatis
+    // diabaikan karena parser baru mulai mencatat setelah boundary section A.
+    const { size } = fs.statSync(filePath);
+    const start = Math.max(0, size - WAF_TAIL_BYTES);
+    const fileStream = fs.createReadStream(filePath, { encoding: 'utf8', start });
     const rl = readline.createInterface({
       input: fileStream,
       crlfDelay: Infinity

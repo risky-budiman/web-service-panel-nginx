@@ -89,12 +89,24 @@ function getCertificateInfo(domain) {
     if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
       try {
         const stats = fs.statSync(certPath);
+        let expiresAt = null;
+        let issuer = null;
+        try {
+          // Baca tanggal kedaluwarsa asli dari sertifikat pertama di fullchain
+          const { X509Certificate } = require('crypto');
+          const cert = new X509Certificate(fs.readFileSync(certPath));
+          expiresAt = new Date(cert.validTo).toISOString();
+          const orgMatch = /O=([^\n]+)/.exec(cert.issuer);
+          issuer = orgMatch ? orgMatch[1].trim() : null;
+        } catch (_) {}
         return {
           exists: true,
           liveDomain: name,
           certPath,
           keyPath,
-          updatedAt: stats.mtime
+          updatedAt: stats.mtime,
+          expiresAt,
+          issuer
         };
       } catch (_) {}
     }
@@ -128,6 +140,11 @@ async function obtainCertificate(domain) {
   }
 
   const domainFlags = getDomainArgs(domain);
+  // Email dipakai Let's Encrypt untuk notifikasi kedaluwarsa (set CERTBOT_EMAIL di .env)
+  const email = (process.env.CERTBOT_EMAIL || '').trim();
+  const emailFlag = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email)
+    ? `--email ${email}`
+    : '--register-unsafely-without-email';
 
   try {
     console.log(`🚀 Menjalankan Certbot untuk domain: ${domainFlags}...`);
@@ -138,11 +155,11 @@ async function obtainCertificate(domain) {
     } catch (_) {}
 
     // Jalankan certbot dengan plugin nginx terlebih dahulu
-    let cmd = `certbot certonly --nginx ${domainFlags} --expand --non-interactive --agree-tos --register-unsafely-without-email 2>&1`;
+    let cmd = `certbot certonly --nginx ${domainFlags} --expand --non-interactive --agree-tos ${emailFlag} 2>&1`;
     let { stdout, stderr } = await execAsync(cmd).catch(async (err) => {
       console.warn(`⚠️  Certbot nginx mode warning, mencoba fallback ke webroot:`, err.message);
       // Fallback ke webroot jika mode nginx gagal
-      const fallbackCmd = `certbot certonly --webroot -w /var/www/html ${domainFlags} --expand --non-interactive --agree-tos --register-unsafely-without-email 2>&1`;
+      const fallbackCmd = `certbot certonly --webroot -w /var/www/html ${domainFlags} --expand --non-interactive --agree-tos ${emailFlag} 2>&1`;
       return await execAsync(fallbackCmd);
     });
 
